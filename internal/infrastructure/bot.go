@@ -1,6 +1,8 @@
 package infrastructure
 
 import (
+	"log/slog"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -8,9 +10,12 @@ type Bot struct {
 	API *tgbotapi.BotAPI
 }
 
-func NewBot(token string) (*Bot, error) {
+func NewBot(token string, logger *slog.Logger) (*Bot, error) {
+	logger.Info("init bot")
+
 	api, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
+		logger.Error("failed to create bot", "error", err)
 		return nil, err
 	}
 	return &Bot{API: api}, nil
