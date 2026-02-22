@@ -32,3 +32,7 @@ func (b *Bot) GetUpdatesChan() tgbotapi.UpdatesChannel {
 	u.Timeout = 60
 	return b.API.GetUpdatesChan(u)
 }
+
+func (b *Bot) Send(chatID int64, msg string) {
+	b.API.Send(tgbotapi.NewMessage(chatID, msg))
+}

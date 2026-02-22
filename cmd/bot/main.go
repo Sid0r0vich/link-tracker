@@ -48,7 +48,7 @@ func run(cfg *Config, bot *infrastructure.Bot, logger *slog.Logger) error {
 	for update := range updates {
 		if update.Message.IsCommand() {
 			logger.Info("get command", "command", update.Message.Command(), "chat_id", update.Message.Chat.ID)
-			application.HandleCommand(bot.API, update.Message)
+			application.HandleCommand(bot, update.Message)
 		}
 	}
 

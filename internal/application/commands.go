@@ -2,20 +2,21 @@ package application
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-type CmdFuncType = func(*tgbotapi.BotAPI, *tgbotapi.Message)
+type CmdFuncType = func(API, *tgbotapi.Message)
 type CmdType struct {
 	Fun  CmdFuncType
 	Desc string
 }
 
 func getTextFunc(text string) CmdFuncType {
-	return func(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-		bot.Send(tgbotapi.NewMessage(msg.Chat.ID, text))
+	return func(bot API, msg *tgbotapi.Message) {
+		bot.Send(msg.Chat.ID, text)
 	}
 }
 
@@ -26,23 +27,29 @@ var UnknownFunc = getTextFunc("Неизвестная команда. Воспо
 
 func init() {
 	CmdToType["help"] = CmdType{
-		Fun: func(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+		Fun: func(bot API, msg *tgbotapi.Message) {
 			var keys []string
 			for key := range CmdToType {
 				keys = append(keys, "/"+key)
 			}
 
+			sort.Strings(keys)
+
 			text := fmt.Sprintf(
 				"Список доступных команд: %s",
 				strings.Join(keys, ", "),
 			)
-			bot.Send(tgbotapi.NewMessage(msg.Chat.ID, text))
+			bot.Send(msg.Chat.ID, text)
 		},
 		Desc: "Помощь в работе с ботом",
 	}
 }
 
-func HandleCommand(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+type API interface {
+	Send(chatID int64, msg string)
+}
+
+func HandleCommand(bot API, msg *tgbotapi.Message) {
 	cmd := strings.Split(msg.Command(), "_")
 
 	var fun CmdFuncType
