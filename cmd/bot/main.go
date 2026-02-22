@@ -8,9 +8,33 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-var (
-	Port = 8081
-)
+type cmdType = func(*tgbotapi.BotAPI, *tgbotapi.Message)
+
+func getTextFunc(text string) cmdType {
+	return func(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+		bot.Send(tgbotapi.NewMessage(msg.Chat.ID, text))
+	}
+}
+
+var cmdToFunc = map[string]cmdType{
+	"start": getTextFunc("Добро пожаловать! Используйте /help, чтобы посмотреть доступные команды."),
+}
+var unknownFunc = getTextFunc("Неизвестная команда. Воспользуйтесь /help, чтобы посмотреть список доступных команд.")
+
+func init() {
+	cmdToFunc["help"] = func(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+		var keys []string
+		for key := range cmdToFunc {
+			keys = append(keys, "/"+key)
+		}
+
+		text := fmt.Sprintf(
+			"Список доступных команд: %s",
+			strings.Join(keys, ", "),
+		)
+		bot.Send(tgbotapi.NewMessage(msg.Chat.ID, text))
+	}
+}
 
 func startBot() error {
 	botToken := os.Getenv("BOT_TOKEN")
@@ -29,23 +53,13 @@ func startBot() error {
 
 	for update := range updates {
 		if update.Message.IsCommand() {
-			var message string
-			chatId := update.Message.Chat.ID
 			cmd := strings.Split(update.Message.Command(), "_")
 
-			switch cmd[0] {
-			case "start":
-				message = "Добро пожаловать! Используйте /help, чтобы посмотреть доступные команды."
-			case "help":
-				message = "Доступные команды: /start, /help"
-			default:
-				message = "Неизвестная команда. Воспользуйтесь /help, чтобы посмотреть список доступных команд."
+			procFunc, ok := cmdToFunc[cmd[0]]
+			if !ok {
+				procFunc = unknownFunc
 			}
-
-			bot.Send(tgbotapi.NewMessage(
-				chatId,
-				message,
-			))
+			procFunc(bot, update.Message)
 		}
 	}
 
