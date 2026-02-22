@@ -8,31 +8,38 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-type cmdType = func(*tgbotapi.BotAPI, *tgbotapi.Message)
+type cmdFuncType = func(*tgbotapi.BotAPI, *tgbotapi.Message)
+type cmdType struct {
+	fun  cmdFuncType
+	desc string
+}
 
-func getTextFunc(text string) cmdType {
+func getTextFunc(text string) cmdFuncType {
 	return func(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
 		bot.Send(tgbotapi.NewMessage(msg.Chat.ID, text))
 	}
 }
 
-var cmdToFunc = map[string]cmdType{
-	"start": getTextFunc("Добро пожаловать! Используйте /help, чтобы посмотреть доступные команды."),
+var cmdToType = map[string]cmdType{
+	"start": {fun: getTextFunc("Добро пожаловать! Используйте /help, чтобы посмотреть доступные команды."), desc: "Начать общение"},
 }
 var unknownFunc = getTextFunc("Неизвестная команда. Воспользуйтесь /help, чтобы посмотреть список доступных команд.")
 
 func init() {
-	cmdToFunc["help"] = func(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-		var keys []string
-		for key := range cmdToFunc {
-			keys = append(keys, "/"+key)
-		}
+	cmdToType["help"] = cmdType{
+		fun: func(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+			var keys []string
+			for key := range cmdToType {
+				keys = append(keys, "/"+key)
+			}
 
-		text := fmt.Sprintf(
-			"Список доступных команд: %s",
-			strings.Join(keys, ", "),
-		)
-		bot.Send(tgbotapi.NewMessage(msg.Chat.ID, text))
+			text := fmt.Sprintf(
+				"Список доступных команд: %s",
+				strings.Join(keys, ", "),
+			)
+			bot.Send(tgbotapi.NewMessage(msg.Chat.ID, text))
+		},
+		desc: "Помощь в работе с ботом",
 	}
 }
 
@@ -47,6 +54,15 @@ func startBot() error {
 		return fmt.Errorf("NewBotAPI failed: %w", err)
 	}
 
+	botCommands := make([]tgbotapi.BotCommand, 0, len(cmdToType))
+	for name, command := range cmdToType {
+		botCommands = append(botCommands, tgbotapi.BotCommand{Command: name, Description: command.desc})
+	}
+	setCommandsConfig := tgbotapi.SetMyCommandsConfig{Commands: botCommands}
+	if _, err := bot.Request(setCommandsConfig); err != nil {
+		return err
+	}
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates := bot.GetUpdatesChan(u)
@@ -55,11 +71,14 @@ func startBot() error {
 		if update.Message.IsCommand() {
 			cmd := strings.Split(update.Message.Command(), "_")
 
-			procFunc, ok := cmdToFunc[cmd[0]]
+			var fun cmdFuncType
+			res, ok := cmdToType[cmd[0]]
 			if !ok {
-				procFunc = unknownFunc
+				fun = unknownFunc
+			} else {
+				fun = res.fun
 			}
-			procFunc(bot, update.Message)
+			fun(bot, update.Message)
 		}
 	}
 
