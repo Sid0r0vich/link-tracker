@@ -3,82 +3,47 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/application"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/infrastructure"
 )
 
-type cmdFuncType = func(*tgbotapi.BotAPI, *tgbotapi.Message)
-type cmdType struct {
-	fun  cmdFuncType
-	desc string
+type Config struct {
+	BotToken string
 }
 
-func getTextFunc(text string) cmdFuncType {
-	return func(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-		bot.Send(tgbotapi.NewMessage(msg.Chat.ID, text))
+func loadConfig() (*Config, error) {
+	botToken := os.Getenv("BOT_TOKEN")
+	if botToken == "" {
+		return nil, fmt.Errorf("environment error")
 	}
-}
 
-var cmdToType = map[string]cmdType{
-	"start": {fun: getTextFunc("Добро пожаловать! Используйте /help, чтобы посмотреть доступные команды."), desc: "Начать общение"},
-}
-var unknownFunc = getTextFunc("Неизвестная команда. Воспользуйтесь /help, чтобы посмотреть список доступных команд.")
-
-func init() {
-	cmdToType["help"] = cmdType{
-		fun: func(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
-			var keys []string
-			for key := range cmdToType {
-				keys = append(keys, "/"+key)
-			}
-
-			text := fmt.Sprintf(
-				"Список доступных команд: %s",
-				strings.Join(keys, ", "),
-			)
-			bot.Send(tgbotapi.NewMessage(msg.Chat.ID, text))
-		},
-		desc: "Помощь в работе с ботом",
-	}
+	return &Config{BotToken: botToken}, nil
 }
 
 func startBot() error {
-	botToken := os.Getenv("BOT_TOKEN")
-	if botToken == "" {
-		return fmt.Errorf("Environment error")
+	cfg, err := loadConfig()
+	if err != nil {
+		return fmt.Errorf("fail to load config: %w", err)
 	}
 
-	bot, err := tgbotapi.NewBotAPI(botToken)
+	bot, err := infrastructure.NewBot(cfg.BotToken)
 	if err != nil {
 		return fmt.Errorf("NewBotAPI failed: %w", err)
 	}
 
-	botCommands := make([]tgbotapi.BotCommand, 0, len(cmdToType))
-	for name, command := range cmdToType {
-		botCommands = append(botCommands, tgbotapi.BotCommand{Command: name, Description: command.desc})
+	botCommands := make([]tgbotapi.BotCommand, 0, len(application.CmdToType))
+	for name, command := range application.CmdToType {
+		botCommands = append(botCommands, tgbotapi.BotCommand{Command: name, Description: command.Desc})
 	}
-	setCommandsConfig := tgbotapi.SetMyCommandsConfig{Commands: botCommands}
-	if _, err := bot.Request(setCommandsConfig); err != nil {
-		return err
-	}
+	bot.SetCommands(botCommands)
 
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-	updates := bot.GetUpdatesChan(u)
+	updates := bot.GetUpdatesChan()
 
 	for update := range updates {
 		if update.Message.IsCommand() {
-			cmd := strings.Split(update.Message.Command(), "_")
-
-			var fun cmdFuncType
-			res, ok := cmdToType[cmd[0]]
-			if !ok {
-				fun = unknownFunc
-			} else {
-				fun = res.fun
-			}
-			fun(bot, update.Message)
+			application.HandleCommand(bot.API, update.Message)
 		}
 	}
 
