@@ -49,15 +49,19 @@ type API interface {
 	Send(chatID int64, msg string)
 }
 
-func HandleCommand(bot API, msg *tgbotapi.Message) {
-	cmd := strings.Split(msg.Command(), "_")
+func HandleCommand(bot API, msg *tgbotapi.Message) error {
+	if !msg.IsCommand() {
+		return fmt.Errorf("message is not command: %s", msg.Text)
+	}
 
 	var fun CmdFuncType
-	res, ok := CmdToType[cmd[0]]
+	res, ok := CmdToType[msg.Command()]
 	if !ok {
 		fun = UnknownFunc
 	} else {
 		fun = res.Fun
 	}
 	fun(bot, msg)
+
+	return nil
 }
