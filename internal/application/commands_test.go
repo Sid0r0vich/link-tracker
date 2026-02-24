@@ -1,6 +1,7 @@
 package application_test
 
 import (
+	"fmt"
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -54,8 +55,15 @@ func TestHandleCommands(t *testing.T) {
 	msgUnknown := tgbotapi.Message{
 		Text: "/unknown",
 		Chat: &tgbotapi.Chat{ID: 0},
+		Entities: []tgbotapi.MessageEntity{
+			{
+				Type:   "bot_command",
+				Length: len("/help"),
+			},
+		},
 	}
 	application.HandleCommand(mockAPI, &msgUnknown)
+	fmt.Printf("mock api: %v\n", mockAPI)
 	if len(mockAPI.Responses) == 0 || mockAPI.Responses[0] != "Неизвестная команда. Воспользуйтесь /help, чтобы посмотреть список доступных команд." {
 		t.Errorf("Expected error message, got: %v", mockAPI.Responses[0])
 	}
