@@ -5,18 +5,18 @@ import (
 	"log/slog"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/application"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository"
 )
 
 type Bot struct {
 	API     *tgbotapi.BotAPI
 	data    domain.BotData
 	logger  *slog.Logger
-	tracker application.Tracker
+	tracker repository.LinkRepository
 }
 
-func NewBot(token string, tracker application.Tracker, logger *slog.Logger) (*Bot, error) {
+func NewBot(token string, tracker repository.LinkRepository, logger *slog.Logger) (*Bot, error) {
 	logger.Info("init bot")
 
 	api, err := tgbotapi.NewBotAPI(token)
@@ -90,7 +90,7 @@ func (b *Bot) AddLink(chatID int64) error {
 		return fmt.Errorf("data must be BotTrackData")
 	}
 
-	err := b.tracker.AddLink(chatID, data.Link)
+	_, err := b.tracker.AddLink(chatID, data.Link)
 	b.SetData(&domain.BotSimpleData{State: domain.Wait})
 	if err != nil {
 		return err

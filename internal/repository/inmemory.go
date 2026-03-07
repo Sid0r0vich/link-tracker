@@ -65,39 +65,49 @@ func (r *InMemoryLinkRepo) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 	return links, nil
 }
 
-func (r *InMemoryLinkRepo) AddLink(chatID int64, link domain.Link) error {
+func (r *InMemoryLinkRepo) AddLink(chatID int64, link domain.Link) (int64, error) {
 	r.Lock()
 	defer r.Unlock()
 
 	chat, ok := r.data[chatID]
 	if !ok {
-		return uerrors.ErrChatNotExists
+		return 0, uerrors.ErrChatNotExists
 	}
 
 	if _, ok = chat[link.URL]; ok {
-		return uerrors.ErrLinkAlreadyExists
+		return 0, uerrors.ErrLinkAlreadyExists
 	}
 
 	chat[link.URL] = domain.LinkInfoWithID{LinkInfo: link.LinkInfo, ID: r.size}
 	r.size++
 
-	return nil
+	return r.size - 1, nil
 }
 
-func (r *InMemoryLinkRepo) DeleteLink(chatID int64, url string) error {
+func (r *InMemoryLinkRepo) DeleteLink(chatID int64, url string) (*domain.LinkWithID, error) {
 	r.Lock()
 	defer r.Unlock()
 
 	chat, ok := r.data[chatID]
 	if !ok {
-		return uerrors.ErrChatNotExists
+		return nil, uerrors.ErrChatNotExists
 	}
 
-	if _, ok = chat[url]; !ok {
-		return uerrors.ErrLinkNotFound
+	link, ok := chat[url]
+	if !ok {
+		return nil, uerrors.ErrLinkNotFound
 	}
 
 	delete(chat, url)
 
-	return nil
+	return &domain.LinkWithID{
+		Link: domain.Link{
+			LinkInfo: domain.LinkInfo{
+				Tags:    link.Tags,
+				Filters: link.Filters,
+			},
+			URL: url,
+		},
+		ID: link.ID,
+	}, nil
 }
