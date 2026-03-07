@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/uerrors"
 )
 
 type InMemoryLinkRepo struct {
@@ -13,12 +13,19 @@ type InMemoryLinkRepo struct {
 	size int64
 }
 
+func NewInMemoryLinkRepo() *InMemoryLinkRepo {
+	return &InMemoryLinkRepo{
+		RWMutex: &sync.RWMutex{},
+		data:    make(map[int64]map[string]domain.LinkInfoWithID),
+	}
+}
+
 func (r *InMemoryLinkRepo) AddChat(chatID int64) error {
 	r.Lock()
 	defer r.Unlock()
 
 	if _, ok := r.data[chatID]; ok {
-		return handlers.ErrChatAlreadyExists
+		return uerrors.ErrChatAlreadyExists
 	}
 
 	r.data[chatID] = make(map[string]domain.LinkInfoWithID, 0)
@@ -31,7 +38,7 @@ func (r *InMemoryLinkRepo) DeleteChat(chatID int64) error {
 	defer r.Unlock()
 
 	if _, ok := r.data[chatID]; !ok {
-		return handlers.ErrChatNotExists
+		return uerrors.ErrChatNotExists
 	}
 
 	delete(r.data, chatID)
@@ -45,7 +52,7 @@ func (r *InMemoryLinkRepo) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 
 	chat, ok := r.data[chatID]
 	if !ok {
-		return []domain.LinkWithID{}, handlers.ErrChatNotExists
+		return []domain.LinkWithID{}, uerrors.ErrChatNotExists
 	}
 
 	links := make([]domain.LinkWithID, len(chat))
@@ -64,11 +71,11 @@ func (r *InMemoryLinkRepo) AddLink(chatID int64, link domain.Link) error {
 
 	chat, ok := r.data[chatID]
 	if !ok {
-		return handlers.ErrChatNotExists
+		return uerrors.ErrChatNotExists
 	}
 
 	if _, ok = chat[link.URL]; ok {
-		return handlers.ErrLinkAlreadyExists
+		return uerrors.ErrLinkAlreadyExists
 	}
 
 	chat[link.URL] = domain.LinkInfoWithID{LinkInfo: link.LinkInfo, ID: r.size}
@@ -83,11 +90,11 @@ func (r *InMemoryLinkRepo) DeleteLink(chatID int64, url string) error {
 
 	chat, ok := r.data[chatID]
 	if !ok {
-		return handlers.ErrChatNotExists
+		return uerrors.ErrChatNotExists
 	}
 
 	if _, ok = chat[url]; !ok {
-		return handlers.ErrLinkNotFound
+		return uerrors.ErrLinkNotFound
 	}
 
 	delete(chat, url)

@@ -18,11 +18,13 @@ func (m *MockAPI) GetState() domain.BotState { return m.state }
 func (m *MockAPI) Send(chatID int64, msg string) {
 	m.Responses = append(m.Responses, msg)
 }
-func (m *MockAPI) StartTrack()                    {}
-func (m *MockAPI) SetTrackLink(string)            {}
-func (m *MockAPI) SetTrackTags([]string) error    { return nil }
-func (m *MockAPI) SetTrackFilters([]string) error { return nil }
-func (m *MockAPI) AddLink(int64) error            { return nil }
+func (m *MockAPI) StartTrack()
+func (m *MockAPI) SetTrackLink(string) error
+func (m *MockAPI) SetTrackTags([]string) error
+func (m *MockAPI) SetTrackFilters([]string) error
+func (m *MockAPI) AddLink(int64) error
+func (m *MockAPI) AddChat(int64) error
+func (m *MockAPI) LogError(error)
 
 func TestHandleCommands(t *testing.T) {
 	mockAPI := &MockAPI{}

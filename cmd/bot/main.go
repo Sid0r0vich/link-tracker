@@ -13,19 +13,21 @@ import (
 )
 
 type Config struct {
-	BotToken string
+	BotToken    string
+	TrackerAddr string
 }
 
 func loadConfig(logger *slog.Logger) (*Config, error) {
 	logger.Info("load config")
 
 	botToken := os.Getenv("BOT_TOKEN")
-	if botToken == "" {
-		logger.Error("fail to load config", "error", "empty token")
+	trackerAddr := os.Getenv("SERVER_ADDR")
+	if botToken == "" || trackerAddr == "" {
+		logger.Error("fail to load config", "error", "empty value")
 		return nil, fmt.Errorf("environment error")
 	}
 
-	return &Config{BotToken: botToken}, nil
+	return &Config{BotToken: botToken, TrackerAddr: trackerAddr}, nil
 }
 
 func run(cfg *Config, bot *infrastructure.Bot, logger *slog.Logger) error {
@@ -57,12 +59,15 @@ func run(cfg *Config, bot *infrastructure.Bot, logger *slog.Logger) error {
 
 func main() {
 	fx.New(
-		fx.NopLogger,
+		//fx.NopLogger,
 		fx.Provide(
 			loadConfig,
 			logs.NewLogger,
-			func(cfg *Config, logger *slog.Logger) (*infrastructure.Bot, error) {
-				return infrastructure.NewBot(cfg.BotToken, logger)
+			func(cfg *Config) *infrastructure.Scrapper {
+				return infrastructure.NewScrapper(cfg.TrackerAddr)
+			},
+			func(cfg *Config, tracker *infrastructure.Scrapper, logger *slog.Logger) (*infrastructure.Bot, error) {
+				return infrastructure.NewBot(cfg.BotToken, tracker, logger)
 			},
 		),
 		fx.Invoke(run),

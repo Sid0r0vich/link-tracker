@@ -16,7 +16,7 @@ type Bot struct {
 	tracker application.Tracker
 }
 
-func NewBot(token string, logger *slog.Logger) (*Bot, error) {
+func NewBot(token string, tracker application.Tracker, logger *slog.Logger) (*Bot, error) {
 	logger.Info("init bot")
 
 	api, err := tgbotapi.NewBotAPI(token)
@@ -24,7 +24,7 @@ func NewBot(token string, logger *slog.Logger) (*Bot, error) {
 		logger.Error("failed to create bot", "error", err)
 		return nil, err
 	}
-	return &Bot{API: api, logger: logger}, nil
+	return &Bot{API: api, data: &domain.BotSimpleData{State: domain.Wait}, logger: logger, tracker: tracker}, nil
 }
 
 func (b *Bot) SetCommands(commands []tgbotapi.BotCommand) error {
@@ -52,13 +52,15 @@ func (b *Bot) Send(chatID int64, msg string) {
 }
 
 func (b *Bot) StartTrack() {
-	data := domain.BotTrackData{BotSimpleData: domain.BotSimpleData{State: domain.StartTrack}}
+	data := domain.BotTrackData{BotSimpleData: domain.BotSimpleData{State: domain.LinkTrack}}
 	b.SetData(&data)
 }
 
-func (b *Bot) SetTrackLink(link string) {
-	data := domain.BotTrackData{BotSimpleData: domain.BotSimpleData{State: domain.LinkTrack}, Link: domain.Link{URL: link}}
+func (b *Bot) SetTrackLink(link string) error {
+	data := domain.BotTrackData{BotSimpleData: domain.BotSimpleData{State: domain.TagsTrack}, Link: domain.Link{URL: link}}
 	b.SetData(&data)
+
+	return nil
 }
 
 func (b *Bot) SetTrackTags(tags []string) error {
@@ -67,6 +69,7 @@ func (b *Bot) SetTrackTags(tags []string) error {
 		return fmt.Errorf("data must be BotTrackData")
 	}
 
+	data.BotSimpleData.State = domain.FilterTrack
 	data.Link.Tags = tags
 	return nil
 }
@@ -87,7 +90,19 @@ func (b *Bot) AddLink(chatID int64) error {
 		return fmt.Errorf("data must be BotTrackData")
 	}
 
-	b.tracker.AddLink(chatID, data.Link)
-	b.logger.Info("data sent!", "data", data)
+	err := b.tracker.AddLink(chatID, data.Link)
+	b.SetData(&domain.BotSimpleData{State: domain.Wait})
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (b *Bot) AddChat(chatID int64) error {
+	return b.tracker.AddChat(chatID)
+}
+
+func (b *Bot) LogError(err error) {
+	b.logger.Error("error ocured:", "error", err)
 }

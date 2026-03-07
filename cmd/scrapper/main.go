@@ -2,15 +2,41 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/logs"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository"
 	"go.uber.org/fx"
 )
 
-func run(api *handlers.UpdatesAPI) error {
+type Config struct {
+	ServerAddr string
+}
+
+func loadConfig(logger *slog.Logger) (*Config, error) {
+	logger.Info("load config")
+
+	serverAddr := os.Getenv("SERVER_ADDR")
+	if serverAddr == "" {
+		logger.Error("fail to load config", "error", "empty server address")
+		return nil, fmt.Errorf("environment error")
+	}
+
+	return &Config{ServerAddr: serverAddr}, nil
+}
+
+func loggingMiddleware(next http.Handler, logger *slog.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger.Info("request", "from", r.Host, "method", r.Method, "URL", r.URL)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func run(cfg *Config, api *handlers.UpdatesAPI, logger *slog.Logger) error {
 	r := mux.NewRouter()
 	r.HandleFunc("/tg-chat/{id:[0-9]+}", api.AddChat).Methods("POST")
 	r.HandleFunc("/tg-chat/{id:[0-9]+}", api.DeleteChat).Methods("DELETE")
@@ -18,10 +44,9 @@ func run(api *handlers.UpdatesAPI) error {
 	r.HandleFunc("/links", api.AddLink).Methods("POST")
 	r.HandleFunc("/links", api.DeleteLink).Methods("DELETE")
 
-	serverAddr := ""
-	err := http.ListenAndServe(serverAddr, r)
+	err := http.ListenAndServe(cfg.ServerAddr, loggingMiddleware(r, logger))
 	if err != nil {
-		return fmt.Errorf("Server error: %w", err)
+		logger.Error("fail to start server", "error", err)
 	}
 
 	return nil
@@ -31,8 +56,12 @@ func main() {
 	fx.New(
 		fx.NopLogger,
 		fx.Provide(
+			loadConfig,
 			logs.NewLogger,
-			handlers.NewUpdatesAPI,
+			repository.NewInMemoryLinkRepo,
+			func(repo *repository.InMemoryLinkRepo, logger *slog.Logger) *handlers.UpdatesAPI {
+				return handlers.NewUpdatesAPI(repo, logger)
+			},
 		),
 		fx.Invoke(run),
 	).Run()

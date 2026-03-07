@@ -12,11 +12,40 @@ import (
 )
 
 type Scrapper struct {
-	client http.Client
+	client  http.Client
+	baseURL string
 }
 
-func NewScrapper() *Scrapper {
-	return &Scrapper{client: http.Client{}}
+func NewScrapper(addr string) *Scrapper {
+	return &Scrapper{client: http.Client{}, baseURL: fmt.Sprintf("http://%s", addr)}
+}
+
+func (s *Scrapper) AddChat(chatID int64) error {
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/tg-chat/%d", s.baseURL, chatID), nil)
+	if err != nil {
+		return fmt.Errorf("making request to scrapper: %w", err)
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("request to scrapper: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var respStruct domain.ErrorResponse
+		err := json.Unmarshal(body, &respStruct)
+		if err != nil {
+			return fmt.Errorf("unmarshal response: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *Scrapper) AddLink(chatID int64, link domain.Link) error {
@@ -37,7 +66,7 @@ func (s *Scrapper) AddLink(chatID int64, link domain.Link) error {
 		return fmt.Errorf("data marshal: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", "localhost/links", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", s.baseURL+"/links", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("making request to scrapper: %w", err)
 	}

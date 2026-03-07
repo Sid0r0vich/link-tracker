@@ -21,7 +21,13 @@ func getTextFunc(text string) cmdHandlerFunc {
 }
 
 var CmdToHandler = map[string]CmdHandler{
-	"start": {Fun: getTextFunc("Добро пожаловать! Используйте /help, чтобы посмотреть доступные команды."), Desc: "Начать общение"},
+	"start": {Fun: func(bot API, msg *tgbotapi.Message) {
+		err := bot.AddChat(msg.Chat.ID)
+		if err != nil {
+			bot.LogError(err)
+		}
+		bot.Send(msg.Chat.ID, "Добро пожаловать! Используйте /help, чтобы посмотреть доступные команды.")
+	}, Desc: "Начать общение"},
 	"track": {Fun: func(bot API, msg *tgbotapi.Message) {
 		bot.StartTrack()
 		bot.Send(msg.Chat.ID, "Введите ссылку для трекинга:")

@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/uerrors"
 )
 
 const (
@@ -35,9 +36,10 @@ type UpdatesAPI struct {
 	logger   *slog.Logger
 }
 
-func NewUpdatesAPI(logger *slog.Logger) *UpdatesAPI {
+func NewUpdatesAPI(linkRepo LinkRepository, logger *slog.Logger) *UpdatesAPI {
 	return &UpdatesAPI{
-		logger: logger,
+		linkRepo: linkRepo,
+		logger:   logger,
 	}
 }
 
@@ -51,7 +53,7 @@ func (api *UpdatesAPI) AddChat(w http.ResponseWriter, r *http.Request) {
 
 	err = api.linkRepo.AddChat(id)
 	if err != nil {
-		if errors.Is(err, ErrChatAlreadyExists) {
+		if errors.Is(err, uerrors.ErrChatAlreadyExists) {
 			writeJSONError(w, http.StatusConflict, ChatAlreadyExists, err.Error())
 			return
 		}
@@ -87,9 +89,9 @@ func (api *UpdatesAPI) AddLink(w http.ResponseWriter, r *http.Request) {
 
 	err = api.linkRepo.AddLink(chatID, link)
 	if err != nil {
-		if errors.Is(err, ErrChatNotExists) {
+		if errors.Is(err, uerrors.ErrChatNotExists) {
 			writeJSONError(w, http.StatusNotFound, ChatNotExists, err.Error())
-		} else if errors.Is(err, ErrLinkAlreadyExists) {
+		} else if errors.Is(err, uerrors.ErrLinkAlreadyExists) {
 			writeJSONError(w, http.StatusConflict, LinkAlreadyExists, err.Error())
 		} else {
 			writeJSONError(w, http.StatusInternalServerError, InternalServerError, err.Error())
