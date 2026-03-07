@@ -8,6 +8,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/application"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/infrastructure"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/logs"
 	"go.uber.org/fx"
 )
 
@@ -25,10 +26,6 @@ func loadConfig(logger *slog.Logger) (*Config, error) {
 	}
 
 	return &Config{BotToken: botToken}, nil
-}
-
-func newLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(os.Stdout, nil))
 }
 
 func run(cfg *Config, bot *infrastructure.Bot, logger *slog.Logger) error {
@@ -63,7 +60,7 @@ func main() {
 		fx.NopLogger,
 		fx.Provide(
 			loadConfig,
-			newLogger,
+			logs.NewLogger,
 			func(cfg *Config, logger *slog.Logger) (*infrastructure.Bot, error) {
 				return infrastructure.NewBot(cfg.BotToken, logger)
 			},

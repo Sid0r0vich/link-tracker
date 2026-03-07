@@ -51,9 +51,23 @@ func (s *Scrapper) AddLink(chatID int64, link domain.Link) error {
 	}
 	defer resp.Body.Close()
 
-	_, err = io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("error reading response: %w", err)
+		return fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		var respStruct domain.AddLinkResponse
+		err := json.Unmarshal(body, &respStruct)
+		if err != nil {
+			return fmt.Errorf("unmarshal response: %w", err)
+		}
+	} else {
+		var respStruct domain.ErrorResponse
+		err := json.Unmarshal(body, &respStruct)
+		if err != nil {
+			return fmt.Errorf("unmarshal response: %w", err)
+		}
 	}
 
 	return nil
