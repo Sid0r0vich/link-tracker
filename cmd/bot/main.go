@@ -32,8 +32,8 @@ func newLogger() *slog.Logger {
 }
 
 func run(cfg *Config, bot *infrastructure.Bot, logger *slog.Logger) error {
-	botCommands := make([]tgbotapi.BotCommand, 0, len(application.CmdToType))
-	for name, command := range application.CmdToType {
+	botCommands := make([]tgbotapi.BotCommand, 0, len(application.CmdToHandler))
+	for name, command := range application.CmdToHandler {
 		botCommands = append(botCommands, tgbotapi.BotCommand{Command: name, Description: command.Desc})
 	}
 	logger.Info("set command", "count", len(botCommands))
@@ -49,6 +49,9 @@ func run(cfg *Config, bot *infrastructure.Bot, logger *slog.Logger) error {
 		if update.Message.IsCommand() {
 			logger.Info("get command", "command", update.Message.Command(), "chat_id", update.Message.Chat.ID)
 			_ = application.HandleCommand(bot, update.Message)
+		} else {
+			logger.Info("get message", "message", update.Message.Text, "chat_id", update.Message.Chat.ID)
+			_ = application.HandleMessage(bot, update.Message)
 		}
 	}
 

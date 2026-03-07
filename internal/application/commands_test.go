@@ -1,19 +1,28 @@
 package application_test
 
 import (
+	"fmt"
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/application"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 )
 
 type MockAPI struct {
+	state     domain.BotState
 	Responses []string
 }
 
+func (m *MockAPI) GetState() domain.BotState { return m.state }
 func (m *MockAPI) Send(chatID int64, msg string) {
 	m.Responses = append(m.Responses, msg)
 }
+func (m *MockAPI) StartTrack()                    {}
+func (m *MockAPI) SetTrackLink(string)            {}
+func (m *MockAPI) SetTrackTags([]string) error    { return nil }
+func (m *MockAPI) SetTrackFilters([]string) error { return nil }
+func (m *MockAPI) AddLink(int64) error            { return nil }
 
 func TestHandleCommands(t *testing.T) {
 	mockAPI := &MockAPI{}
@@ -54,8 +63,15 @@ func TestHandleCommands(t *testing.T) {
 	msgUnknown := tgbotapi.Message{
 		Text: "/unknown",
 		Chat: &tgbotapi.Chat{ID: 0},
+		Entities: []tgbotapi.MessageEntity{
+			{
+				Type:   "bot_command",
+				Length: len("/help"),
+			},
+		},
 	}
 	application.HandleCommand(mockAPI, &msgUnknown)
+	fmt.Printf("mock api: %v\n", mockAPI)
 	if len(mockAPI.Responses) == 0 || mockAPI.Responses[0] != "Неизвестная команда. Воспользуйтесь /help, чтобы посмотреть список доступных команд." {
 		t.Errorf("Expected error message, got: %v", mockAPI.Responses[0])
 	}
