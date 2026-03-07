@@ -4,10 +4,12 @@ import (
 	"log/slog"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 )
 
 type Bot struct {
-	API *tgbotapi.BotAPI
+	API   *tgbotapi.BotAPI
+	state domain.BotState
 }
 
 func NewBot(token string, logger *slog.Logger) (*Bot, error) {
@@ -33,6 +35,14 @@ func (b *Bot) GetUpdatesChan() tgbotapi.UpdatesChannel {
 	return b.API.GetUpdatesChan(u)
 }
 
+func (b *Bot) GetState() domain.BotState {
+	return b.state
+}
+
 func (b *Bot) Send(chatID int64, msg string) {
 	b.API.Send(tgbotapi.NewMessage(chatID, msg))
+}
+
+func (b *Bot) StartTrack() {
+	b.state = domain.StartTrack
 }

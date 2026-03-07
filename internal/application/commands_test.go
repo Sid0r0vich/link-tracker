@@ -6,15 +6,19 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/application"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 )
 
 type MockAPI struct {
+	state     domain.BotState
 	Responses []string
 }
 
+func (m *MockAPI) GetState() domain.BotState { return m.state }
 func (m *MockAPI) Send(chatID int64, msg string) {
 	m.Responses = append(m.Responses, msg)
 }
+func (m *MockAPI) StartTrack() {}
 
 func TestHandleCommands(t *testing.T) {
 	mockAPI := &MockAPI{}

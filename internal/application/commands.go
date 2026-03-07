@@ -6,30 +6,48 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 )
 
-type CmdFuncType = func(API, *tgbotapi.Message)
-type CmdType struct {
-	Fun  CmdFuncType
+type cmdHandlerFunc = func(API, *tgbotapi.Message)
+type CmdHandler struct {
+	Fun  cmdHandlerFunc
 	Desc string
 }
 
-func getTextFunc(text string) CmdFuncType {
+func getTextFunc(text string) cmdHandlerFunc {
 	return func(bot API, msg *tgbotapi.Message) {
 		bot.Send(msg.Chat.ID, text)
 	}
 }
 
-var CmdToType = map[string]CmdType{
+var CmdToHandler = map[string]CmdHandler{
 	"start": {Fun: getTextFunc("Добро пожаловать! Используйте /help, чтобы посмотреть доступные команды."), Desc: "Начать общение"},
+	"track": {Fun: func(bot API, msg *tgbotapi.Message) {
+		bot.StartTrack()
+	}, Desc: ""},
 }
-var UnknownFunc = getTextFunc("Неизвестная команда. Воспользуйтесь /help, чтобы посмотреть список доступных команд.")
+var unknownFunc = getTextFunc("Неизвестная команда. Воспользуйтесь /help, чтобы посмотреть список доступных команд.")
+
+type messageHandlerFunc = func(API, *tgbotapi.Message)
+type MessageHandler struct {
+	Fun messageHandlerFunc
+}
+
+var StateToHandler = map[domain.BotState]MessageHandler{
+	domain.StartTrack: {Fun: func(bot API, msg *tgbotapi.Message) {
+		fmt.Print("START TRACK!\n")
+	}},
+}
+var unknownStateHandlerFunc = func(bot API, msg *tgbotapi.Message) {
+	bot.Send(msg.Chat.ID, "Ошибка на стороне сервера")
+}
 
 func init() {
-	CmdToType["help"] = CmdType{
+	CmdToHandler["help"] = CmdHandler{
 		Fun: func(bot API, msg *tgbotapi.Message) {
 			var keys []string
-			for key := range CmdToType {
+			for key := range CmdToHandler {
 				keys = append(keys, "/"+key)
 			}
 
@@ -46,7 +64,9 @@ func init() {
 }
 
 type API interface {
+	GetState() domain.BotState
 	Send(chatID int64, msg string)
+	StartTrack()
 }
 
 func HandleCommand(bot API, msg *tgbotapi.Message) error {
@@ -54,10 +74,23 @@ func HandleCommand(bot API, msg *tgbotapi.Message) error {
 		return fmt.Errorf("message is not command: %s", msg.Text)
 	}
 
-	var fun CmdFuncType
-	res, ok := CmdToType[msg.Command()]
+	var fun cmdHandlerFunc
+	res, ok := CmdToHandler[msg.Command()]
 	if !ok {
-		fun = UnknownFunc
+		fun = unknownFunc
+	} else {
+		fun = res.Fun
+	}
+	fun(bot, msg)
+
+	return nil
+}
+
+func HandleMessage(bot API, msg *tgbotapi.Message) error {
+	var fun messageHandlerFunc
+	res, ok := StateToHandler[bot.GetState()]
+	if !ok {
+		fun = unknownStateHandlerFunc
 	} else {
 		fun = res.Fun
 	}
