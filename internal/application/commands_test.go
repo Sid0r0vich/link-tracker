@@ -19,11 +19,16 @@ func (m *MockAPI) Send(chatID int64, msg string) {
 	m.Responses = append(m.Responses, msg)
 }
 func (m *MockAPI) StartTrack()
-func (m *MockAPI) SetTrackLink(string) error
+func (m *MockAPI) StopTrack()
+func (m *MockAPI) SetTrackLink(string)
+func (m *MockAPI) SetUntrackLink(string)
 func (m *MockAPI) SetTrackTags([]string) error
 func (m *MockAPI) SetTrackFilters([]string) error
-func (m *MockAPI) AddLink(int64) error
 func (m *MockAPI) AddChat(int64) error
+func (m *MockAPI) DeleteChat(int64) error
+func (m *MockAPI) GetLinks(int64) ([]domain.LinkWithID, error)
+func (m *MockAPI) AddLink(int64) error
+func (m *MockAPI) DeleteLink(int64) error
 func (m *MockAPI) LogError(error)
 
 func TestHandleCommands(t *testing.T) {

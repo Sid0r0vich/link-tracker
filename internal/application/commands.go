@@ -32,6 +32,33 @@ var CmdToHandler = map[string]CmdHandler{
 		bot.StartTrack()
 		bot.Send(msg.Chat.ID, "Введите ссылку для трекинга:")
 	}, Desc: "Добавить ссылку для отслеживания"},
+	"untrack": {Fun: func(bot API, msg *tgbotapi.Message) {
+		bot.StopTrack()
+		bot.Send(msg.Chat.ID, "Введите ссылку, которую хотите удалить:")
+	}, Desc: "Прекратить отслеживание ссылки"},
+	"list": {Fun: func(bot API, msg *tgbotapi.Message) {
+		links, err := bot.GetLinks(msg.Chat.ID)
+		ans := "Ссылки не найдены"
+		if err != nil {
+			bot.LogError(err)
+		}
+
+		if len(links) > 0 {
+			fmtList := make([]string, len(links))
+			for ind, link := range links {
+				fmtList[ind] = fmt.Sprintf(
+					"Ссылка: %s\nТеги: %s\nФильтры: %s\n",
+					link.URL,
+					strings.Join(link.Tags, ", "),
+					strings.Join(link.Filters, ", "),
+				)
+			}
+
+			ans = strings.Join(fmtList, "\n")
+		}
+
+		bot.Send(msg.Chat.ID, ans)
+	}},
 }
 var unknownFunc = getTextFunc("Неизвестная команда. Воспользуйтесь /help, чтобы посмотреть список доступных команд.")
 

@@ -8,10 +8,15 @@ type API interface {
 	GetState() domain.BotState
 	Send(int64, string)
 	StartTrack()
-	SetTrackLink(string) error
+	StopTrack()
+	SetTrackLink(string)
+	SetUntrackLink(string)
 	SetTrackTags([]string) error
 	SetTrackFilters([]string) error
-	AddLink(int64) error
 	AddChat(int64) error
+	DeleteChat(int64) error
+	GetLinks(int64) ([]domain.LinkWithID, error)
+	AddLink(int64) error
+	DeleteLink(int64) error
 	LogError(error)
 }

@@ -7,6 +7,7 @@ const (
 	LinkTrack
 	TagsTrack
 	FilterTrack
+	LinkUntrack
 )
 
 type BotData interface {
@@ -26,6 +27,7 @@ type BotTrackData struct {
 	Link Link
 }
 
-func (d *BotTrackData) GetState() BotState {
-	return d.BotSimpleData.GetState()
+type BotUntrackData struct {
+	BotSimpleData
+	URL string
 }
