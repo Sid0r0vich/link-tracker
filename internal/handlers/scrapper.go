@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/mux"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
+	scrapper_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/scrapper"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/uerrors"
 )
 
@@ -23,11 +24,15 @@ const (
 )
 
 func writeJSONError(w http.ResponseWriter, code int, description string, msg string) {
+	writeJSONErrorWithCode(w, code, "", description, msg)
+}
+
+func writeJSONErrorWithCode(w http.ResponseWriter, code int, error_code string, description string, msg string) {
 	w.WriteHeader(code)
 
 	resp := domain.ErrorResponse{
 		Description:      description,
-		Code:             strconv.Itoa(code),
+		Code:             error_code,
 		ExceptionMessage: msg,
 	}
 	json.NewEncoder(w).Encode(resp)
@@ -36,12 +41,18 @@ func writeJSONError(w http.ResponseWriter, code int, description string, msg str
 type UpdatesAPI struct {
 	linkRepo repository.LinkRepository
 	Logger   *slog.Logger
+	Scrapper scrapper_repository.Scrapper
 }
 
-func NewUpdatesAPI(linkRepo repository.LinkRepository, logger *slog.Logger) *UpdatesAPI {
+func NewUpdatesAPI(
+	linkRepo repository.LinkRepository,
+	scrapper scrapper_repository.Scrapper,
+	logger *slog.Logger,
+) *UpdatesAPI {
 	return &UpdatesAPI{
 		linkRepo: linkRepo,
 		Logger:   logger,
+		Scrapper: scrapper,
 	}
 }
 
@@ -145,6 +156,14 @@ func (api *UpdatesAPI) AddLink(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, BadRequestParams, err.Error())
 		return
 	}
+
+	update, err := api.Scrapper.GetUpdate(link.URL)
+	if err != nil {
+		writeJSONErrorWithCode(w, http.StatusBadRequest, "bad_url", BadRequestParams, "incorrect link")
+		return
+	}
+
+	link.UpdatedAt = update.UpdatedAt
 
 	id, err := api.linkRepo.AddLink(chatID, link)
 	if err != nil {

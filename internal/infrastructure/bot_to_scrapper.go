@@ -18,10 +18,10 @@ type BotToScrapper struct {
 	baseURL string
 }
 
-func (s *BotToScrapper) makeRequest(method string, url string, reqBody io.Reader, headers map[string]string) (int, []byte, error) {
+func (s *BotToScrapper) makeRequest(method string, url string, reqBody io.Reader, headers map[string]string) (int, string, []byte, error) {
 	req, err := http.NewRequest(method, url, reqBody)
 	if err != nil {
-		return 0, nil, fmt.Errorf("making request to scrapper: %w", err)
+		return 0, "", nil, fmt.Errorf("making request to scrapper: %w", err)
 	}
 
 	for k, v := range headers {
@@ -30,26 +30,26 @@ func (s *BotToScrapper) makeRequest(method string, url string, reqBody io.Reader
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return 0, nil, fmt.Errorf("request to scrapper: %w", err)
+		return 0, "", nil, fmt.Errorf("request to scrapper: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, nil, fmt.Errorf("reading response: %w", err)
+		return 0, "", nil, fmt.Errorf("reading response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		var respStruct domain.ErrorResponse
 		err := json.Unmarshal(body, &respStruct)
 		if err != nil {
-			return resp.StatusCode, nil, fmt.Errorf("unmarshal response: %w", err)
+			return resp.StatusCode, "", nil, fmt.Errorf("unmarshal response: %w", err)
 		}
 
-		return resp.StatusCode, nil, errors.New(respStruct.ExceptionMessage)
+		return resp.StatusCode, respStruct.Code, nil, errors.New(respStruct.ExceptionMessage)
 	}
 
-	return resp.StatusCode, body, nil
+	return resp.StatusCode, "", body, nil
 }
 
 func NewScrapper(addr string) *BotToScrapper {
@@ -57,17 +57,17 @@ func NewScrapper(addr string) *BotToScrapper {
 }
 
 func (s *BotToScrapper) AddChat(chatID int64) error {
-	_, _, err := s.makeRequest("POST", fmt.Sprintf("%s/tg-chat/%d", s.baseURL, chatID), nil, nil)
+	_, _, _, err := s.makeRequest("POST", fmt.Sprintf("%s/tg-chat/%d", s.baseURL, chatID), nil, nil)
 	return err
 }
 
 func (s *BotToScrapper) DeleteChat(chatID int64) error {
-	_, _, err := s.makeRequest("DELETE", fmt.Sprintf("%s/tg-chat/%d", s.baseURL, chatID), nil, nil)
+	_, _, _, err := s.makeRequest("DELETE", fmt.Sprintf("%s/tg-chat/%d", s.baseURL, chatID), nil, nil)
 	return err
 }
 
 func (s *BotToScrapper) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
-	_, body, err := s.makeRequest(
+	_, _, body, err := s.makeRequest(
 		"GET",
 		fmt.Sprintf("%s/links", s.baseURL),
 		nil,
@@ -118,7 +118,7 @@ func (s *BotToScrapper) AddLink(chatID int64, link domain.Link) (int64, error) {
 		return 0, fmt.Errorf("data marshal: %w", err)
 	}
 
-	code, body, err := s.makeRequest(
+	code, error_code, body, err := s.makeRequest(
 		"POST",
 		fmt.Sprintf("%s/links", s.baseURL),
 		bytes.NewBuffer(jsonData),
@@ -128,6 +128,10 @@ func (s *BotToScrapper) AddLink(chatID int64, link domain.Link) (int64, error) {
 		if code == http.StatusConflict {
 			return 0, uerrors.ErrLinkAlreadyExists
 		}
+		if error_code == "bad_url" {
+			return 0, uerrors.ErrBadURL
+		}
+
 		return 0, err
 	}
 
@@ -152,7 +156,7 @@ func (s *BotToScrapper) DeleteLink(chatID int64, url string) (*domain.LinkWithID
 		return nil, fmt.Errorf("data marshal: %w", err)
 	}
 
-	code, body, err := s.makeRequest(
+	code, _, body, err := s.makeRequest(
 		"DELETE",
 		fmt.Sprintf("%s/links", s.baseURL),
 		bytes.NewBuffer(jsonData),
