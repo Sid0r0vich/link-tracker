@@ -2,6 +2,7 @@ package application
 
 import (
 	"errors"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
@@ -11,6 +12,15 @@ import (
 type messageHandlerFunc = func(API, *tgbotapi.Message)
 type MessageHandler struct {
 	Fun messageHandlerFunc
+}
+
+func getStrs(str string) []string {
+	es := strings.Split(str, ",")
+	for ind, e := range es {
+		es[ind] = strings.TrimSpace(e)
+	}
+
+	return es
 }
 
 var StateToHandler = map[domain.BotState]MessageHandler{
@@ -25,7 +35,7 @@ var StateToHandler = map[domain.BotState]MessageHandler{
 		bot.Send(msg.Chat.ID, "Введите теги:")
 	}},
 	domain.TagsTrack: {Fun: func(bot API, msg *tgbotapi.Message) {
-		var tags []string
+		tags := getStrs(msg.Text)
 		err := bot.SetTrackTags(msg.Chat.ID, tags)
 		ans := "Введите фильтры:"
 		if err != nil {
@@ -35,7 +45,7 @@ var StateToHandler = map[domain.BotState]MessageHandler{
 		bot.Send(msg.Chat.ID, ans)
 	}},
 	domain.FilterTrack: {Fun: func(bot API, msg *tgbotapi.Message) {
-		var filters []string
+		filters := getStrs(msg.Text)
 		err := bot.SetTrackFilters(msg.Chat.ID, filters)
 		if err != nil {
 			bot.Send(msg.Chat.ID, "Данные введены некорректно")

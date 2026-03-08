@@ -32,9 +32,6 @@ type BotTrackData struct {
 	Link Link
 }
 
-//func (d *BotTrackData) GetState() BotState  { return d.State }
-//func (d *BotTrackData) SetState(s BotState) { d.SetState(s) }
-
 type BotUntrackData struct {
 	BotSimpleData
 	URL string

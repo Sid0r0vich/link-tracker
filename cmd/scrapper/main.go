@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/logs"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/middleware"
 	link_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
 	"go.uber.org/fx"
 )
@@ -29,13 +30,6 @@ func loadConfig(logger *slog.Logger) (*Config, error) {
 	return &Config{ServerAddr: serverAddr}, nil
 }
 
-func loggingMiddleware(next http.Handler, logger *slog.Logger) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger.Info("request", "from", r.Host, "method", r.Method, "URL", r.URL)
-		next.ServeHTTP(w, r)
-	})
-}
-
 func run(cfg *Config, api *handlers.UpdatesAPI, logger *slog.Logger) error {
 	r := mux.NewRouter()
 	r.HandleFunc("/tg-chat/{id:[0-9]+}", api.AddChat).Methods("POST")
@@ -44,7 +38,7 @@ func run(cfg *Config, api *handlers.UpdatesAPI, logger *slog.Logger) error {
 	r.HandleFunc("/links", api.AddLink).Methods("POST")
 	r.HandleFunc("/links", api.DeleteLink).Methods("DELETE")
 
-	err := http.ListenAndServe(cfg.ServerAddr, loggingMiddleware(r, logger))
+	err := http.ListenAndServe(cfg.ServerAddr, middleware.LoggingMiddleware(r, logger))
 	if err != nil {
 		logger.Error("fail to start server", "error", err)
 	}
