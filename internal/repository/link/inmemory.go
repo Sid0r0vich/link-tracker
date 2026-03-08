@@ -2,6 +2,7 @@ package link_repository
 
 import (
 	"sync"
+	"time"
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/uerrors"
@@ -9,14 +10,16 @@ import (
 
 type InMemoryLinkRepo struct {
 	*sync.RWMutex
-	data map[int64]map[string]domain.LinkInfoWithID
-	size int64
+	urlToLink       map[int64]map[string]domain.LinkInfoWithID
+	size            int64
+	urlToLinkUpdate map[string]domain.LinkUpdate
 }
 
 func NewInMemoryLinkRepo() *InMemoryLinkRepo {
 	return &InMemoryLinkRepo{
-		RWMutex: &sync.RWMutex{},
-		data:    make(map[int64]map[string]domain.LinkInfoWithID),
+		RWMutex:         &sync.RWMutex{},
+		urlToLink:       make(map[int64]map[string]domain.LinkInfoWithID),
+		urlToLinkUpdate: make(map[string]domain.LinkUpdate),
 	}
 }
 
@@ -24,11 +27,11 @@ func (r *InMemoryLinkRepo) AddChat(chatID int64) error {
 	r.Lock()
 	defer r.Unlock()
 
-	if _, ok := r.data[chatID]; ok {
+	if _, ok := r.urlToLink[chatID]; ok {
 		return uerrors.ErrChatAlreadyExists
 	}
 
-	r.data[chatID] = make(map[string]domain.LinkInfoWithID, 0)
+	r.urlToLink[chatID] = make(map[string]domain.LinkInfoWithID, 0)
 
 	return nil
 }
@@ -37,11 +40,11 @@ func (r *InMemoryLinkRepo) DeleteChat(chatID int64) error {
 	r.Lock()
 	defer r.Unlock()
 
-	if _, ok := r.data[chatID]; !ok {
+	if _, ok := r.urlToLink[chatID]; !ok {
 		return uerrors.ErrChatNotExists
 	}
 
-	delete(r.data, chatID)
+	delete(r.urlToLink, chatID)
 
 	return nil
 }
@@ -50,7 +53,7 @@ func (r *InMemoryLinkRepo) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 	r.RLock()
 	defer r.RUnlock()
 
-	chat, ok := r.data[chatID]
+	chat, ok := r.urlToLink[chatID]
 	if !ok {
 		return []domain.LinkWithID{}, uerrors.ErrChatNotExists
 	}
@@ -69,7 +72,7 @@ func (r *InMemoryLinkRepo) AddLink(chatID int64, link domain.Link) (int64, error
 	r.Lock()
 	defer r.Unlock()
 
-	chat, ok := r.data[chatID]
+	chat, ok := r.urlToLink[chatID]
 	if !ok {
 		return 0, uerrors.ErrChatNotExists
 	}
@@ -81,6 +84,14 @@ func (r *InMemoryLinkRepo) AddLink(chatID int64, link domain.Link) (int64, error
 	chat[link.URL] = domain.LinkInfoWithID{LinkInfo: link.LinkInfo, ID: r.size}
 	r.size++
 
+	linkUpd, ok := r.urlToLinkUpdate[link.URL]
+	if !ok {
+		linkUpd = domain.LinkUpdate{UpdatedAt: time.Now(), IDs: make(map[int64]struct{})}
+	}
+
+	linkUpd.IDs[chatID] = struct{}{}
+	r.urlToLinkUpdate[link.URL] = linkUpd
+
 	return r.size - 1, nil
 }
 
@@ -88,7 +99,7 @@ func (r *InMemoryLinkRepo) DeleteLink(chatID int64, url string) (*domain.LinkWit
 	r.Lock()
 	defer r.Unlock()
 
-	chat, ok := r.data[chatID]
+	chat, ok := r.urlToLink[chatID]
 	if !ok {
 		return nil, uerrors.ErrChatNotExists
 	}
@@ -100,6 +111,12 @@ func (r *InMemoryLinkRepo) DeleteLink(chatID int64, url string) (*domain.LinkWit
 
 	delete(chat, url)
 
+	linkUpd, ok := r.urlToLinkUpdate[url]
+	if ok {
+		delete(linkUpd.IDs, chatID)
+		r.urlToLinkUpdate[url] = linkUpd
+	}
+
 	return &domain.LinkWithID{
 		Link: domain.Link{
 			LinkInfo: domain.LinkInfo{
@@ -110,4 +127,39 @@ func (r *InMemoryLinkRepo) DeleteLink(chatID int64, url string) (*domain.LinkWit
 		},
 		ID: link.ID,
 	}, nil
+}
+
+func (r *InMemoryLinkRepo) CheckLinkExists(chatID int64, url string) (bool, error) {
+	r.RLock()
+	defer r.RUnlock()
+
+	chat, ok := r.urlToLink[chatID]
+	if !ok {
+		return false, nil
+	}
+
+	_, ok = chat[url]
+	return ok, nil
+}
+
+func (r *InMemoryLinkRepo) GetAllLinks() (map[string]domain.LinkUpdate, error) {
+	r.RLock()
+	defer r.RUnlock()
+
+	return r.urlToLinkUpdate, nil
+}
+
+func (r *InMemoryLinkRepo) GetTimeAndUpdateLink(url string, updatedAt time.Time) (bool, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	link := r.urlToLinkUpdate[url]
+	if !link.UpdatedAt.Before(updatedAt) {
+		return false, nil
+	}
+
+	link.UpdatedAt = updatedAt
+	r.urlToLinkUpdate[url] = link
+
+	return true, nil
 }

@@ -13,12 +13,12 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/uerrors"
 )
 
-type Scrapper struct {
+type BotToScrapper struct {
 	client  http.Client
 	baseURL string
 }
 
-func (s *Scrapper) makeRequest(method string, url string, reqBody io.Reader, headers map[string]string) (int, []byte, error) {
+func (s *BotToScrapper) makeRequest(method string, url string, reqBody io.Reader, headers map[string]string) (int, []byte, error) {
 	req, err := http.NewRequest(method, url, reqBody)
 	if err != nil {
 		return 0, nil, fmt.Errorf("making request to scrapper: %w", err)
@@ -52,21 +52,21 @@ func (s *Scrapper) makeRequest(method string, url string, reqBody io.Reader, hea
 	return resp.StatusCode, body, nil
 }
 
-func NewScrapper(addr string) *Scrapper {
-	return &Scrapper{client: http.Client{}, baseURL: fmt.Sprintf("http://%s", addr)}
+func NewScrapper(addr string) *BotToScrapper {
+	return &BotToScrapper{client: http.Client{}, baseURL: fmt.Sprintf("http://%s", addr)}
 }
 
-func (s *Scrapper) AddChat(chatID int64) error {
+func (s *BotToScrapper) AddChat(chatID int64) error {
 	_, _, err := s.makeRequest("POST", fmt.Sprintf("%s/tg-chat/%d", s.baseURL, chatID), nil, nil)
 	return err
 }
 
-func (s *Scrapper) DeleteChat(chatID int64) error {
+func (s *BotToScrapper) DeleteChat(chatID int64) error {
 	_, _, err := s.makeRequest("DELETE", fmt.Sprintf("%s/tg-chat/%d", s.baseURL, chatID), nil, nil)
 	return err
 }
 
-func (s *Scrapper) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
+func (s *BotToScrapper) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 	_, body, err := s.makeRequest(
 		"GET",
 		fmt.Sprintf("%s/links", s.baseURL),
@@ -100,7 +100,7 @@ func (s *Scrapper) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 	return res, nil
 }
 
-func (s *Scrapper) AddLink(chatID int64, link domain.Link) (int64, error) {
+func (s *BotToScrapper) AddLink(chatID int64, link domain.Link) (int64, error) {
 	type Request struct {
 		Link    string   `json:"link"`
 		Tags    []string `json:"tags"`
@@ -118,13 +118,16 @@ func (s *Scrapper) AddLink(chatID int64, link domain.Link) (int64, error) {
 		return 0, fmt.Errorf("data marshal: %w", err)
 	}
 
-	_, body, err := s.makeRequest(
+	code, body, err := s.makeRequest(
 		"POST",
 		fmt.Sprintf("%s/links", s.baseURL),
 		bytes.NewBuffer(jsonData),
 		map[string]string{"Content-Type": "application/json", "Tg-Chat-Id": strconv.FormatInt(chatID, 10)},
 	)
 	if err != nil {
+		if code == http.StatusConflict {
+			return 0, uerrors.ErrLinkAlreadyExists
+		}
 		return 0, err
 	}
 
@@ -137,7 +140,7 @@ func (s *Scrapper) AddLink(chatID int64, link domain.Link) (int64, error) {
 	return respStruct.ID, nil
 }
 
-func (s *Scrapper) DeleteLink(chatID int64, url string) (*domain.LinkWithID, error) {
+func (s *BotToScrapper) DeleteLink(chatID int64, url string) (*domain.LinkWithID, error) {
 	type Request struct {
 		Link string `json:"link"`
 	}

@@ -1,8 +1,11 @@
 package domain
 
+import "time"
+
 type LinkInfo struct {
-	Tags    []string `json:"tags"`
-	Filters []string `json:"filters"`
+	Tags      []string `json:"tags"`
+	Filters   []string `json:"filters"`
+	UpdatedAt time.Time
 }
 
 type LinkInfoWithID struct {
@@ -18,4 +21,9 @@ type Link struct {
 type LinkWithID struct {
 	Link
 	ID int64 `json:"id"`
+}
+
+type LinkUpdate struct {
+	IDs       map[int64]struct{}
+	UpdatedAt time.Time
 }

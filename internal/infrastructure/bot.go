@@ -68,8 +68,8 @@ func (b *Bot) StopTrack(chatID int64) {
 	b.SetData(chatID, data)
 }
 
-func (b *Bot) SetTrackLink(chatID int64, link string) error {
-	data := domain.BotTrackData{BotSimpleData: domain.BotSimpleData{State: domain.TagsTrack}, Link: domain.Link{URL: link}}
+func (b *Bot) SetTrackLink(chatID int64, url string) error {
+	data := domain.BotTrackData{BotSimpleData: domain.BotSimpleData{State: domain.TagsTrack}, Link: domain.Link{URL: url}}
 	return b.SetData(chatID, data)
 }
 

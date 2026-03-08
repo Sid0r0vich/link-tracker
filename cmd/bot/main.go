@@ -65,6 +65,11 @@ func run(cfg *Config, bot *infrastructure.Bot, logger *slog.Logger, api *handler
 	updates := bot.GetUpdatesChan()
 	logger.Info("get updates")
 	for update := range updates {
+		if update.Message == nil {
+			bot.LogError(fmt.Errorf("nil message"))
+			continue
+		}
+
 		if update.Message.IsCommand() {
 			logger.Info("get command", "command", update.Message.Command(), "chat_id", update.Message.Chat.ID)
 			_ = application.HandleCommand(bot, update.Message)
@@ -83,13 +88,13 @@ func main() {
 		fx.Provide(
 			loadConfig,
 			logs.NewLogger,
-			func(cfg *Config) *infrastructure.Scrapper {
+			func(cfg *Config) *infrastructure.BotToScrapper {
 				return infrastructure.NewScrapper(cfg.TrackerAddr)
 			},
 			state_repository.NewInMemoryStateRepo,
 			func(
 				cfg *Config,
-				tracker *infrastructure.Scrapper,
+				tracker *infrastructure.BotToScrapper,
 				stateRepo *state_repository.InMemoryStateRepo,
 				logger *slog.Logger,
 			) (*infrastructure.Bot, error) {

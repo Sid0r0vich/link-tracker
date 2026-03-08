@@ -1,6 +1,8 @@
 package link_repository
 
 import (
+	"time"
+
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 )
 
@@ -10,4 +12,9 @@ type LinkRepository interface {
 	GetLinks(int64) ([]domain.LinkWithID, error)
 	AddLink(int64, domain.Link) (int64, error)
 	DeleteLink(int64, string) (*domain.LinkWithID, error)
+}
+
+type LinkUpdateRepository interface {
+	GetTimeAndUpdateLink(string, time.Time) (bool, error)
+	GetAllLinks() (map[string]domain.LinkUpdate, error)
 }
