@@ -58,9 +58,9 @@ func (b *Bot) Send(chatID int64, msg string) {
 	b.API.Send(tgbotapi.NewMessage(chatID, msg))
 }
 
-func (b *Bot) StartTrack(chatID int64) {
+func (b *Bot) StartTrack(chatID int64) error {
 	data := domain.BotTrackData{BotSimpleData: domain.BotSimpleData{State: domain.LinkTrack}}
-	b.SetData(chatID, data)
+	return b.SetData(chatID, data)
 }
 
 func (b *Bot) StopTrack(chatID int64) {
@@ -68,14 +68,14 @@ func (b *Bot) StopTrack(chatID int64) {
 	b.SetData(chatID, data)
 }
 
-func (b *Bot) SetTrackLink(chatID int64, link string) {
+func (b *Bot) SetTrackLink(chatID int64, link string) error {
 	data := domain.BotTrackData{BotSimpleData: domain.BotSimpleData{State: domain.TagsTrack}, Link: domain.Link{URL: link}}
-	b.SetData(chatID, data)
+	return b.SetData(chatID, data)
 }
 
-func (b *Bot) SetUntrackLink(chatID int64, url string) {
+func (b *Bot) SetUntrackLink(chatID int64, url string) error {
 	data := domain.BotUntrackData{BotSimpleData: domain.BotSimpleData{State: domain.Wait}, URL: url}
-	b.SetData(chatID, data)
+	return b.SetData(chatID, data)
 }
 
 func (b *Bot) SetTrackTags(chatID int64, tags []string) error {
@@ -84,7 +84,7 @@ func (b *Bot) SetTrackTags(chatID int64, tags []string) error {
 		return err
 	}
 
-	trackData, ok := data.(*domain.BotTrackData)
+	trackData, ok := data.(domain.BotTrackData)
 	if !ok {
 		return fmt.Errorf("data must be BotTrackData")
 	}
@@ -100,7 +100,7 @@ func (b *Bot) SetTrackFilters(chatID int64, filters []string) error {
 		return err
 	}
 
-	trackData, ok := data.(*domain.BotTrackData)
+	trackData, ok := data.(domain.BotTrackData)
 	if !ok {
 		return fmt.Errorf("data must be BotTrackData")
 	}
@@ -127,28 +127,31 @@ func (b *Bot) AddLink(chatID int64) error {
 		return err
 	}
 
-	trackData, ok := data.(*domain.BotTrackData)
+	trackData, ok := data.(domain.BotTrackData)
 	if !ok {
 		return fmt.Errorf("data must be BotTrackData")
 	}
 
 	_, err = b.tracker.AddLink(chatID, trackData.Link)
-	b.SetData(chatID, &domain.BotSimpleData{State: domain.Wait})
+	if err != nil {
+		return err
+	}
 
-	return err
+	return b.SetData(chatID, &domain.BotSimpleData{State: domain.Wait})
 }
 
 func (b *Bot) DeleteLink(chatID int64) error {
 	data, err := b.GetData(chatID)
-	untrackData, ok := data.(*domain.BotUntrackData)
+	untrackData, ok := data.(domain.BotUntrackData)
 	if !ok {
 		return fmt.Errorf("data must be BotUntrackData")
 	}
 
 	_, err = b.tracker.DeleteLink(chatID, untrackData.URL)
-	b.SetData(chatID, &domain.BotSimpleData{State: domain.Wait})
-
-	return err
+	if err != nil {
+		return err
+	}
+	return b.SetData(chatID, &domain.BotSimpleData{State: domain.Wait})
 }
 
 func (b *Bot) LogError(err error) {

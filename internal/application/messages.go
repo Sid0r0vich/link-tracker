@@ -18,7 +18,10 @@ var StateToHandler = map[domain.BotState]MessageHandler{
 		bot.Send(msg.Chat.ID, "Зайдите в меню, чтобы отправить команду")
 	}},
 	domain.LinkTrack: {Fun: func(bot API, msg *tgbotapi.Message) {
-		bot.SetTrackLink(msg.Chat.ID, msg.Text)
+		err := bot.SetTrackLink(msg.Chat.ID, msg.Text)
+		if err != nil {
+			bot.LogError(err)
+		}
 		bot.Send(msg.Chat.ID, "Введите теги:")
 	}},
 	domain.TagsTrack: {Fun: func(bot API, msg *tgbotapi.Message) {
@@ -26,6 +29,7 @@ var StateToHandler = map[domain.BotState]MessageHandler{
 		err := bot.SetTrackTags(msg.Chat.ID, tags)
 		ans := "Введите фильтры:"
 		if err != nil {
+			bot.LogError(err)
 			ans = "Данные введены некорректно"
 		}
 		bot.Send(msg.Chat.ID, ans)
@@ -41,6 +45,7 @@ var StateToHandler = map[domain.BotState]MessageHandler{
 		ans := "Ссылка успешно добавлена!"
 		err = bot.AddLink(msg.Chat.ID)
 		if err != nil {
+			bot.LogError(err)
 			if errors.Is(err, uerrors.ErrLinkAlreadyExists) {
 				ans = "Ссылка уже отслеживается"
 			}
@@ -48,17 +53,20 @@ var StateToHandler = map[domain.BotState]MessageHandler{
 		bot.Send(msg.Chat.ID, ans)
 	}},
 	domain.LinkUntrack: {Fun: func(bot API, msg *tgbotapi.Message) {
-		bot.SetUntrackLink(msg.Chat.ID, msg.Text)
-
-		ans := "Ссылка больше не отслеживается"
-		err := bot.DeleteLink(msg.Chat.ID)
+		err := bot.SetUntrackLink(msg.Chat.ID, msg.Text)
 		if err != nil {
 			bot.LogError(err)
-			if errors.Is(err, uerrors.ErrLinkNotFound) {
-				ans = "Ссылка не найдена"
-			}
+		}
 
+		ans := "Ссылка больше не отслеживается"
+		err = bot.DeleteLink(msg.Chat.ID)
+		if err != nil {
 			ans = "Ошибка на стороне сервера"
+			if errors.Is(err, uerrors.ErrChatNotExistsOrLinkNotFound) {
+				ans = "Ссылка не найдена"
+			} else {
+				bot.LogError(err)
+			}
 		}
 		bot.Send(msg.Chat.ID, ans)
 	}},
@@ -76,7 +84,10 @@ func HandleMessage(bot API, msg *tgbotapi.Message) error {
 		}
 
 		data = domain.BotSimpleData{State: domain.Wait}
-		bot.SetData(msg.Chat.ID, data)
+		err := bot.SetData(msg.Chat.ID, data)
+		if err != nil {
+			bot.LogError(err)
+		}
 	}
 
 	res, ok := StateToHandler[data.GetState()]

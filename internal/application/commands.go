@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/uerrors"
 )
 
 type cmdHandlerFunc = func(API, *tgbotapi.Message)
@@ -59,7 +60,7 @@ var CmdToHandler = map[string]CmdHandler{
 		}
 
 		bot.Send(msg.Chat.ID, ans)
-	}},
+	}, Desc: "Получить список ссылок"},
 	"cancel": {Fun: func(bot API, msg *tgbotapi.Message) {
 		ans := "Отмена операции"
 		if err := bot.Wait(msg.Chat.ID); err != nil {
@@ -69,7 +70,7 @@ var CmdToHandler = map[string]CmdHandler{
 			ans = "Бот ожидает команды"
 		}
 		bot.Send(msg.Chat.ID, ans)
-	}},
+	}, Desc: "Отменить текущий флоу"},
 }
 var unknownFunc = getTextFunc("Неизвестная команда. Воспользуйтесь /help, чтобы посмотреть список доступных команд.")
 
@@ -96,6 +97,17 @@ func init() {
 func HandleCommand(bot API, msg *tgbotapi.Message) error {
 	if !msg.IsCommand() {
 		return fmt.Errorf("message is not command: %s", msg.Text)
+	}
+
+	if err := bot.Wait(msg.Chat.ID); err != nil {
+		bot.LogError(err)
+
+		if errors.Is(err, uerrors.ErrChatNotExists) {
+			err := bot.AddChat(msg.Chat.ID)
+			if err != nil {
+				bot.LogError(err)
+			}
+		}
 	}
 
 	var fun cmdHandlerFunc

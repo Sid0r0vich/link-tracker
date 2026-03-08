@@ -12,10 +12,10 @@ type API interface {
 	GetData(int64) (domain.BotData, error)
 	SetData(int64, domain.BotData) error
 	Send(int64, string)
-	StartTrack(int64)
+	StartTrack(int64) error
 	StopTrack(int64)
-	SetTrackLink(int64, string)
-	SetUntrackLink(int64, string)
+	SetTrackLink(int64, string) error
+	SetUntrackLink(int64, string) error
 	SetTrackTags(int64, []string) error
 	SetTrackFilters(int64, []string) error
 	AddChat(int64) error

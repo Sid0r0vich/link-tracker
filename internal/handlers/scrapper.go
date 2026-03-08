@@ -35,13 +35,13 @@ func writeJSONError(w http.ResponseWriter, code int, description string, msg str
 
 type UpdatesAPI struct {
 	linkRepo repository.LinkRepository
-	logger   *slog.Logger
+	Logger   *slog.Logger
 }
 
 func NewUpdatesAPI(linkRepo repository.LinkRepository, logger *slog.Logger) *UpdatesAPI {
 	return &UpdatesAPI{
 		linkRepo: linkRepo,
-		logger:   logger,
+		Logger:   logger,
 	}
 }
 
@@ -194,7 +194,7 @@ func (api *UpdatesAPI) DeleteLink(w http.ResponseWriter, r *http.Request) {
 	link, err := api.linkRepo.DeleteLink(chatID, req.Link)
 	if err != nil {
 		if errors.Is(err, uerrors.ErrChatNotExists) || errors.Is(err, uerrors.ErrLinkNotFound) {
-			writeJSONError(w, http.StatusBadRequest, ChatNotExistsOrLinkNotFound, err.Error())
+			writeJSONError(w, http.StatusNotFound, ChatNotExistsOrLinkNotFound, err.Error())
 			return
 		}
 

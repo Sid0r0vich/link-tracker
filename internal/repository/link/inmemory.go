@@ -1,4 +1,4 @@
-package repository
+package link_repository
 
 import (
 	"sync"

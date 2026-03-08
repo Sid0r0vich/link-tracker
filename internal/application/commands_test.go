@@ -21,10 +21,10 @@ func (m *MockAPI) SetData(int64, domain.BotData) error
 func (m *MockAPI) Send(chatID int64, msg string) {
 	m.Responses = append(m.Responses, msg)
 }
-func (m *MockAPI) StartTrack(int64)
+func (m *MockAPI) StartTrack(int64) error
 func (m *MockAPI) StopTrack(int64)
-func (m *MockAPI) SetTrackLink(int64, string)
-func (m *MockAPI) SetUntrackLink(int64, string)
+func (m *MockAPI) SetTrackLink(int64, string) error
+func (m *MockAPI) SetUntrackLink(int64, string) error
 func (m *MockAPI) SetTrackTags(int64, []string) error
 func (m *MockAPI) SetTrackFilters(int64, []string) error
 func (m *MockAPI) AddChat(int64) error
