@@ -39,7 +39,14 @@ var CmdToHandler = map[string]CmdHandler{
 		bot.Send(msg.Chat.ID, "Введите ссылку, которую хотите удалить:")
 	}, Desc: "Прекратить отслеживание ссылки"},
 	"list": {Fun: func(bot API, msg *tgbotapi.Message) {
-		links, err := bot.GetLinks(msg.Chat.ID)
+		message := msg.Text
+		parts := strings.Split(message, " ")
+		tag := ""
+		if len(parts) > 1 {
+			tag = parts[1]
+		}
+
+		links, err := bot.GetLinks(msg.Chat.ID, tag)
 		ans := "Ссылки не найдены"
 		if err != nil {
 			bot.LogError(err)

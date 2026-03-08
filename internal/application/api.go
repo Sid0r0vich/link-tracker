@@ -20,7 +20,7 @@ type API interface {
 	SetTrackFilters(int64, []string) error
 	AddChat(int64) error
 	DeleteChat(int64) error
-	GetLinks(int64) ([]domain.LinkWithID, error)
+	GetLinks(int64, string) ([]domain.LinkWithID, error)
 	AddLink(int64) error
 	DeleteLink(int64) error
 	LogError(error)

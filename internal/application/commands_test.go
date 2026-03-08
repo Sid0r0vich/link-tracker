@@ -29,7 +29,7 @@ func (m *MockAPI) SetTrackTags(int64, []string) error
 func (m *MockAPI) SetTrackFilters(int64, []string) error
 func (m *MockAPI) AddChat(int64) error
 func (m *MockAPI) DeleteChat(int64) error
-func (m *MockAPI) GetLinks(int64) ([]domain.LinkWithID, error)
+func (m *MockAPI) GetLinks(int64, string) ([]domain.LinkWithID, error)
 func (m *MockAPI) AddLink(int64) error
 func (m *MockAPI) DeleteLink(int64) error
 func (m *MockAPI) LogError(error)

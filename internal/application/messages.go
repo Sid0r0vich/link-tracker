@@ -67,6 +67,10 @@ var StateToHandler = map[domain.BotState]MessageHandler{
 				ans = "Ссылка уже отслеживается"
 			} else if errors.Is(err, uerrors.ErrBadURL) {
 				ans = "Некорректная ссылка"
+			} else if errors.Is(err, uerrors.ErrBadToken) {
+				ans = "Некорректный токен"
+			} else if errors.Is(err, uerrors.ErrTooManyRequests) {
+				ans = "Слишком больше количество запросов"
 			}
 		}
 		bot.Send(msg.Chat.ID, ans)

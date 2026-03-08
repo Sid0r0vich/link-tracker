@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"fmt"
 	"log/slog"
+	"slices"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/application"
@@ -117,8 +118,24 @@ func (b *Bot) DeleteChat(chatID int64) error {
 	return b.tracker.DeleteChat(chatID)
 }
 
-func (b *Bot) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
-	return b.tracker.GetLinks(chatID)
+func (b *Bot) GetLinks(chatID int64, tag string) ([]domain.LinkWithID, error) {
+	allLinks, err := b.tracker.GetLinks(chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	if tag == "" {
+		return allLinks, nil
+	}
+
+	links := make([]domain.LinkWithID, 0)
+	for _, link := range allLinks {
+		if slices.Contains(link.Tags, tag) {
+			links = append(links, link)
+		}
+	}
+
+	return links, err
 }
 
 func (b *Bot) AddLink(chatID int64) error {

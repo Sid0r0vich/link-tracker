@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -159,6 +160,7 @@ func (api *UpdatesAPI) AddLink(w http.ResponseWriter, r *http.Request) {
 
 	update, err := api.Scrapper.GetUpdate(link.URL)
 	if err != nil {
+		fmt.Printf("get updates from scrapper: %v\n", err)
 		writeJSONErrorWithCode(w, http.StatusBadRequest, "bad_url", BadRequestParams, "incorrect link")
 		return
 	}

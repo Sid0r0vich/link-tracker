@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/uerrors"
 )
 
 type GithubScrapper struct {
@@ -38,12 +39,20 @@ func (s *GithubScrapper) GetUpdate(url string) (*domain.Update, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		_, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read body: %w", err)
 		}
-		return nil, fmt.Errorf("GitHub API error, status code: %d", resp.StatusCode)
+
+		switch resp.StatusCode {
+		case http.StatusTooManyRequests:
+			return nil, uerrors.ErrTooManyRequests
+		case http.StatusUnauthorized:
+			return nil, uerrors.ErrBadToken
+		default:
+			return nil, fmt.Errorf("GitHub API error, status code: %w", uerrors.ErrBadURL)
+		}
 	}
 
 	var upd struct {
