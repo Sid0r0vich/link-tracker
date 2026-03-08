@@ -14,22 +14,26 @@ type MockAPI struct {
 	Responses []string
 }
 
-func (m *MockAPI) GetState() domain.BotState { return m.state }
+func (m *MockAPI) GetData(int64) (domain.BotData, error) {
+	return domain.BotSimpleData{State: m.state}, nil
+}
+func (m *MockAPI) SetData(int64, domain.BotData) error
 func (m *MockAPI) Send(chatID int64, msg string) {
 	m.Responses = append(m.Responses, msg)
 }
-func (m *MockAPI) StartTrack()
-func (m *MockAPI) StopTrack()
-func (m *MockAPI) SetTrackLink(string)
-func (m *MockAPI) SetUntrackLink(string)
-func (m *MockAPI) SetTrackTags([]string) error
-func (m *MockAPI) SetTrackFilters([]string) error
+func (m *MockAPI) StartTrack(int64)
+func (m *MockAPI) StopTrack(int64)
+func (m *MockAPI) SetTrackLink(int64, string)
+func (m *MockAPI) SetUntrackLink(int64, string)
+func (m *MockAPI) SetTrackTags(int64, []string) error
+func (m *MockAPI) SetTrackFilters(int64, []string) error
 func (m *MockAPI) AddChat(int64) error
 func (m *MockAPI) DeleteChat(int64) error
 func (m *MockAPI) GetLinks(int64) ([]domain.LinkWithID, error)
 func (m *MockAPI) AddLink(int64) error
 func (m *MockAPI) DeleteLink(int64) error
 func (m *MockAPI) LogError(error)
+func (m *MockAPI) Wait(int64) error
 
 func TestHandleCommands(t *testing.T) {
 	mockAPI := &MockAPI{}

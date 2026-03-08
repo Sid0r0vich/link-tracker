@@ -5,18 +5,20 @@ import (
 	"log/slog"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/application"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository"
+	link_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
+	state_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/state"
 )
 
 type Bot struct {
-	API     *tgbotapi.BotAPI
-	data    domain.BotData
-	logger  *slog.Logger
-	tracker repository.LinkRepository
+	API       *tgbotapi.BotAPI
+	stateRepo state_repository.StateRepository
+	logger    *slog.Logger
+	tracker   link_repository.LinkRepository
 }
 
-func NewBot(token string, tracker repository.LinkRepository, logger *slog.Logger) (*Bot, error) {
+func NewBot(token string, tracker link_repository.LinkRepository, stateRepo state_repository.StateRepository, logger *slog.Logger) (*Bot, error) {
 	logger.Info("init bot")
 
 	api, err := tgbotapi.NewBotAPI(token)
@@ -24,7 +26,7 @@ func NewBot(token string, tracker repository.LinkRepository, logger *slog.Logger
 		logger.Error("failed to create bot", "error", err)
 		return nil, err
 	}
-	return &Bot{API: api, data: &domain.BotSimpleData{State: domain.Wait}, logger: logger, tracker: tracker}, nil
+	return &Bot{API: api, stateRepo: stateRepo, logger: logger, tracker: tracker}, nil
 }
 
 func (b *Bot) SetCommands(commands []tgbotapi.BotCommand) error {
@@ -39,57 +41,72 @@ func (b *Bot) GetUpdatesChan() tgbotapi.UpdatesChannel {
 	return b.API.GetUpdatesChan(u)
 }
 
-func (b *Bot) GetState() domain.BotState {
-	return b.data.GetState()
+func (b *Bot) GetData(chatID int64) (domain.BotData, error) {
+	data, err := b.stateRepo.GetData(chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
-func (b *Bot) SetData(d domain.BotData) {
-	b.data = d
+func (b *Bot) SetData(chatID int64, d domain.BotData) error {
+	return b.stateRepo.SetData(chatID, d)
 }
 
 func (b *Bot) Send(chatID int64, msg string) {
 	b.API.Send(tgbotapi.NewMessage(chatID, msg))
 }
 
-func (b *Bot) StartTrack() {
+func (b *Bot) StartTrack(chatID int64) {
 	data := domain.BotTrackData{BotSimpleData: domain.BotSimpleData{State: domain.LinkTrack}}
-	b.SetData(&data)
+	b.SetData(chatID, data)
 }
 
-func (b *Bot) StopTrack() {
+func (b *Bot) StopTrack(chatID int64) {
 	data := domain.BotUntrackData{BotSimpleData: domain.BotSimpleData{State: domain.LinkUntrack}}
-	b.SetData(&data)
+	b.SetData(chatID, data)
 }
 
-func (b *Bot) SetTrackLink(link string) {
+func (b *Bot) SetTrackLink(chatID int64, link string) {
 	data := domain.BotTrackData{BotSimpleData: domain.BotSimpleData{State: domain.TagsTrack}, Link: domain.Link{URL: link}}
-	b.SetData(&data)
+	b.SetData(chatID, data)
 }
 
-func (b *Bot) SetUntrackLink(url string) {
+func (b *Bot) SetUntrackLink(chatID int64, url string) {
 	data := domain.BotUntrackData{BotSimpleData: domain.BotSimpleData{State: domain.Wait}, URL: url}
-	b.SetData(&data)
+	b.SetData(chatID, data)
 }
 
-func (b *Bot) SetTrackTags(tags []string) error {
-	data, ok := b.data.(*domain.BotTrackData)
+func (b *Bot) SetTrackTags(chatID int64, tags []string) error {
+	data, err := b.GetData(chatID)
+	if err != nil {
+		return err
+	}
+
+	trackData, ok := data.(*domain.BotTrackData)
 	if !ok {
 		return fmt.Errorf("data must be BotTrackData")
 	}
 
-	data.BotSimpleData.State = domain.FilterTrack
-	data.Link.Tags = tags
-	return nil
+	trackData.BotSimpleData.State = domain.FilterTrack
+	trackData.Link.Tags = tags
+	return b.SetData(chatID, trackData)
 }
 
-func (b *Bot) SetTrackFilters(filters []string) error {
-	data, ok := b.data.(*domain.BotTrackData)
+func (b *Bot) SetTrackFilters(chatID int64, filters []string) error {
+	data, err := b.GetData(chatID)
+	if err != nil {
+		return err
+	}
+
+	trackData, ok := data.(*domain.BotTrackData)
 	if !ok {
 		return fmt.Errorf("data must be BotTrackData")
 	}
 
-	data.Link.Filters = filters
-	return nil
+	trackData.Link.Filters = filters
+	return b.SetData(chatID, trackData)
 }
 
 func (b *Bot) AddChat(chatID int64) error {
@@ -105,29 +122,49 @@ func (b *Bot) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 }
 
 func (b *Bot) AddLink(chatID int64) error {
-	data, ok := b.data.(*domain.BotTrackData)
+	data, err := b.GetData(chatID)
+	if err != nil {
+		return err
+	}
+
+	trackData, ok := data.(*domain.BotTrackData)
 	if !ok {
 		return fmt.Errorf("data must be BotTrackData")
 	}
 
-	_, err := b.tracker.AddLink(chatID, data.Link)
-	b.SetData(&domain.BotSimpleData{State: domain.Wait})
+	_, err = b.tracker.AddLink(chatID, trackData.Link)
+	b.SetData(chatID, &domain.BotSimpleData{State: domain.Wait})
 
 	return err
 }
 
 func (b *Bot) DeleteLink(chatID int64) error {
-	data, ok := b.data.(*domain.BotUntrackData)
+	data, err := b.GetData(chatID)
+	untrackData, ok := data.(*domain.BotUntrackData)
 	if !ok {
 		return fmt.Errorf("data must be BotUntrackData")
 	}
 
-	_, err := b.tracker.DeleteLink(chatID, data.URL)
-	b.SetData(&domain.BotSimpleData{State: domain.Wait})
+	_, err = b.tracker.DeleteLink(chatID, untrackData.URL)
+	b.SetData(chatID, &domain.BotSimpleData{State: domain.Wait})
 
 	return err
 }
 
 func (b *Bot) LogError(err error) {
 	b.logger.Error("error ocured:", "error", err)
+}
+
+func (b *Bot) Wait(chatID int64) error {
+	data, err := b.GetData(chatID)
+	if err != nil {
+		return err
+	}
+
+	if data.GetState() != domain.Wait {
+		b.SetData(chatID, domain.BotSimpleData{State: domain.Wait})
+		return nil
+	}
+
+	return application.ErrBotAlreadyWaiting
 }

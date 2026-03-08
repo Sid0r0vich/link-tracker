@@ -9,7 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/logs"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository"
+	link_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
 	"go.uber.org/fx"
 )
 
@@ -58,8 +58,8 @@ func main() {
 		fx.Provide(
 			loadConfig,
 			logs.NewLogger,
-			repository.NewInMemoryLinkRepo,
-			func(repo *repository.InMemoryLinkRepo, logger *slog.Logger) *handlers.UpdatesAPI {
+			link_repository.NewInMemoryLinkRepo,
+			func(repo *link_repository.InMemoryLinkRepo, logger *slog.Logger) *handlers.UpdatesAPI {
 				return handlers.NewUpdatesAPI(repo, logger)
 			},
 		),

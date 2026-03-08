@@ -1,6 +1,7 @@
 package application
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -29,11 +30,11 @@ var CmdToHandler = map[string]CmdHandler{
 		bot.Send(msg.Chat.ID, "Добро пожаловать! Используйте /help, чтобы посмотреть доступные команды.")
 	}, Desc: "Начать общение"},
 	"track": {Fun: func(bot API, msg *tgbotapi.Message) {
-		bot.StartTrack()
+		bot.StartTrack(msg.Chat.ID)
 		bot.Send(msg.Chat.ID, "Введите ссылку для трекинга:")
 	}, Desc: "Добавить ссылку для отслеживания"},
 	"untrack": {Fun: func(bot API, msg *tgbotapi.Message) {
-		bot.StopTrack()
+		bot.StopTrack(msg.Chat.ID)
 		bot.Send(msg.Chat.ID, "Введите ссылку, которую хотите удалить:")
 	}, Desc: "Прекратить отслеживание ссылки"},
 	"list": {Fun: func(bot API, msg *tgbotapi.Message) {
@@ -57,6 +58,16 @@ var CmdToHandler = map[string]CmdHandler{
 			ans = strings.Join(fmtList, "\n")
 		}
 
+		bot.Send(msg.Chat.ID, ans)
+	}},
+	"cancel": {Fun: func(bot API, msg *tgbotapi.Message) {
+		ans := "Отмена операции"
+		if err := bot.Wait(msg.Chat.ID); err != nil {
+			if errors.Is(err, ErrBotAlreadyWaiting) {
+
+			}
+			ans = "Бот ожидает команды"
+		}
 		bot.Send(msg.Chat.ID, ans)
 	}},
 }

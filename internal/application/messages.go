@@ -18,12 +18,12 @@ var StateToHandler = map[domain.BotState]MessageHandler{
 		bot.Send(msg.Chat.ID, "Зайдите в меню, чтобы отправить команду")
 	}},
 	domain.LinkTrack: {Fun: func(bot API, msg *tgbotapi.Message) {
-		bot.SetTrackLink(msg.Text)
+		bot.SetTrackLink(msg.Chat.ID, msg.Text)
 		bot.Send(msg.Chat.ID, "Введите теги:")
 	}},
 	domain.TagsTrack: {Fun: func(bot API, msg *tgbotapi.Message) {
 		var tags []string
-		err := bot.SetTrackTags(tags)
+		err := bot.SetTrackTags(msg.Chat.ID, tags)
 		ans := "Введите фильтры:"
 		if err != nil {
 			ans = "Данные введены некорректно"
@@ -32,7 +32,7 @@ var StateToHandler = map[domain.BotState]MessageHandler{
 	}},
 	domain.FilterTrack: {Fun: func(bot API, msg *tgbotapi.Message) {
 		var filters []string
-		err := bot.SetTrackFilters(filters)
+		err := bot.SetTrackFilters(msg.Chat.ID, filters)
 		if err != nil {
 			bot.Send(msg.Chat.ID, "Данные введены некорректно")
 			return
@@ -48,7 +48,7 @@ var StateToHandler = map[domain.BotState]MessageHandler{
 		bot.Send(msg.Chat.ID, ans)
 	}},
 	domain.LinkUntrack: {Fun: func(bot API, msg *tgbotapi.Message) {
-		bot.SetUntrackLink(msg.Text)
+		bot.SetUntrackLink(msg.Chat.ID, msg.Text)
 
 		ans := "Ссылка больше не отслеживается"
 		err := bot.DeleteLink(msg.Chat.ID)
@@ -69,7 +69,17 @@ var unknownStateHandlerFunc = func(bot API, msg *tgbotapi.Message) {
 
 func HandleMessage(bot API, msg *tgbotapi.Message) error {
 	var fun messageHandlerFunc
-	res, ok := StateToHandler[bot.GetState()]
+	data, err := bot.GetData(msg.Chat.ID)
+	if err != nil {
+		if !errors.Is(err, uerrors.ErrChatNotExists) {
+			return err
+		}
+
+		data = domain.BotSimpleData{State: domain.Wait}
+		bot.SetData(msg.Chat.ID, data)
+	}
+
+	res, ok := StateToHandler[data.GetState()]
 	if !ok {
 		fun = unknownStateHandlerFunc
 	} else {

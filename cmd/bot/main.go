@@ -9,6 +9,7 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/application"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/infrastructure"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/logs"
+	state_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/state"
 	"go.uber.org/fx"
 )
 
@@ -66,8 +67,9 @@ func main() {
 			func(cfg *Config) *infrastructure.Scrapper {
 				return infrastructure.NewScrapper(cfg.TrackerAddr)
 			},
-			func(cfg *Config, tracker *infrastructure.Scrapper, logger *slog.Logger) (*infrastructure.Bot, error) {
-				return infrastructure.NewBot(cfg.BotToken, tracker, logger)
+			state_repository.NewInMemoryStateRepo,
+			func(cfg *Config, tracker *infrastructure.Scrapper, stateRepo *state_repository.InMemoryStateRepo, logger *slog.Logger) (*infrastructure.Bot, error) {
+				return infrastructure.NewBot(cfg.BotToken, tracker, stateRepo, logger)
 			},
 		),
 		fx.Invoke(run),

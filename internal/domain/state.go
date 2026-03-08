@@ -12,20 +12,28 @@ const (
 
 type BotData interface {
 	GetState() BotState
+	SetState(BotState)
 }
 
 type BotSimpleData struct {
 	State BotState
 }
 
-func (d *BotSimpleData) GetState() BotState {
+func (d BotSimpleData) GetState() BotState {
 	return d.State
+}
+
+func (d BotSimpleData) SetState(s BotState) {
+	d.State = s
 }
 
 type BotTrackData struct {
 	BotSimpleData
 	Link Link
 }
+
+//func (d *BotTrackData) GetState() BotState  { return d.State }
+//func (d *BotTrackData) SetState(s BotState) { d.SetState(s) }
 
 type BotUntrackData struct {
 	BotSimpleData
