@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/gorilla/mux"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/api/scrapper/rest"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/infrastructure"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/logs"
@@ -39,16 +39,12 @@ func loadConfig(logger *slog.Logger) (*Config, error) {
 }
 
 func run(cfg *Config, api *handlers.UpdatesAPI, logger *slog.Logger, sched *scheduler.Scheduler) error {
-	r := mux.NewRouter()
-	r.HandleFunc("/tg-chat/{id:[0-9]+}", api.AddChat).Methods("POST")
-	r.HandleFunc("/tg-chat/{id:[0-9]+}", api.DeleteChat).Methods("DELETE")
-	r.HandleFunc("/links", api.GetLinks).Methods("GET")
-	r.HandleFunc("/links", api.AddLink).Methods("POST")
-	r.HandleFunc("/links", api.DeleteLink).Methods("DELETE")
-
 	go sched.Start()
 
-	err := http.ListenAndServe(cfg.ServerAddr, middleware.LoggingMiddleware(r, logger))
+	opts := rest.StdHTTPServerOptions{}
+	handler := rest.HandlerWithOptions(api, opts)
+
+	err := http.ListenAndServe(cfg.ServerAddr, middleware.LoggingMiddleware(handler, logger))
 	if err != nil {
 		logger.Error("fail to start server", "error", err)
 	}

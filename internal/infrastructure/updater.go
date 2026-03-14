@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/api/scrapper/rest"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 )
 
@@ -46,13 +47,13 @@ func (s *Updater) SendUpdate(data *domain.UpdateResponse) error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		var respStruct domain.ErrorResponse
+		var respStruct rest.ApiErrorResponse
 		err := json.Unmarshal(body, &respStruct)
 		if err != nil {
 			return fmt.Errorf("unmarshal response: %w", err)
 		}
 
-		return errors.New(respStruct.ExceptionMessage)
+		return errors.New(*respStruct.ExceptionMessage)
 	}
 
 	return nil

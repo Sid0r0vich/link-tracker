@@ -50,8 +50,10 @@ func (s *GithubScrapper) GetUpdate(url string) (*domain.Update, error) {
 			return nil, uerrors.ErrTooManyRequests
 		case http.StatusUnauthorized:
 			return nil, uerrors.ErrBadToken
+		case http.StatusForbidden:
+			return nil, uerrors.ErrInternal
 		default:
-			return nil, fmt.Errorf("GitHub API error, status code: %w", uerrors.ErrBadURL)
+			return nil, fmt.Errorf("GitHub API error, status: %d, code: %w", resp.StatusCode, uerrors.ErrBadURL)
 		}
 	}
 

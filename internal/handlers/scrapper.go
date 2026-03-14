@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 
-	"github.com/gorilla/mux"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/api/scrapper/rest"
+	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/api/scrapper/rest"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
 	scrapper_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/scrapper"
@@ -31,10 +31,10 @@ func writeJSONError(w http.ResponseWriter, code int, description string, msg str
 func writeJSONErrorWithCode(w http.ResponseWriter, code int, error_code string, description string, msg string) {
 	w.WriteHeader(code)
 
-	resp := domain.ErrorResponse{
-		Description:      description,
-		Code:             error_code,
-		ExceptionMessage: msg,
+	resp := rest.ApiErrorResponse{
+		Description:      &description,
+		Code:             &error_code,
+		ExceptionMessage: &msg,
 	}
 	json.NewEncoder(w).Encode(resp)
 }
@@ -57,18 +57,22 @@ func NewUpdatesAPI(
 	}
 }
 
-func (api *UpdatesAPI) AddChat(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id, err := strconv.ParseInt(vars["id"], 10, 64)
+func (api *UpdatesAPI) DeleteLinks(w http.ResponseWriter, r *http.Request, params api.DeleteLinksParams) {
+	type Request struct {
+		Link string `json:"link"`
+	}
+
+	var req Request
+	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, BadRequestParams, err.Error())
 		return
 	}
 
-	err = api.linkRepo.AddChat(id)
+	link, err := api.linkRepo.DeleteLink(params.TgChatId, req.Link)
 	if err != nil {
-		if errors.Is(err, uerrors.ErrChatAlreadyExists) {
-			writeJSONError(w, http.StatusConflict, ChatAlreadyExists, err.Error())
+		if errors.Is(err, uerrors.ErrChatNotExists) || errors.Is(err, uerrors.ErrLinkNotFound) {
+			writeJSONError(w, http.StatusNotFound, ChatNotExistsOrLinkNotFound, err.Error())
 			return
 		}
 
@@ -76,83 +80,55 @@ func (api *UpdatesAPI) AddChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-}
-
-func (api *UpdatesAPI) DeleteChat(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id, err := strconv.ParseInt(vars["id"], 10, 64)
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, BadRequestParams, err.Error())
-		return
+	resp := rest.LinkResponse{
+		Id:      &link.ID,
+		Url:     &link.URL,
+		Tags:    &link.Tags,
+		Filters: &link.Filters,
 	}
 
-	err = api.linkRepo.DeleteChat(id)
-	if err != nil {
-		if errors.Is(err, uerrors.ErrChatNotExists) {
-			writeJSONError(w, http.StatusNotFound, ChatNotExists, err.Error())
-			return
-		}
-
-		writeJSONError(w, http.StatusInternalServerError, InternalServerError, err.Error())
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
-func (api *UpdatesAPI) GetLinks(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	chatIDStr := r.Header.Get("Tg-Chat-Id")
-	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, BadRequestParams, err.Error())
-		return
-	}
-
-	links, err := api.linkRepo.GetLinks(chatID)
-	if err != nil {
-		if errors.Is(err, uerrors.ErrChatNotExists) {
-			writeJSONError(w, http.StatusNotFound, ChatNotExists, err.Error())
-			return
-		}
-
-		writeJSONError(w, http.StatusInternalServerError, InternalServerError, err.Error())
-		return
-	}
-
-	linksResp := make([]domain.LinkResponse, len(links))
-	for ind, link := range links {
-		linksResp[ind] = domain.LinkResponse{
-			ID:      link.ID,
-			URL:     link.URL,
-			Tags:    link.Tags,
-			Filters: link.Filters,
-		}
-	}
-
-	resp := domain.LinksResponse{
-		Links: linksResp,
-		Size:  len(linksResp),
-	}
-
+	w.Header().Set("Content-Type", "json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (api *UpdatesAPI) AddLink(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	chatIDStr := r.Header.Get("Tg-Chat-Id")
-	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
+func (api *UpdatesAPI) GetLinks(w http.ResponseWriter, r *http.Request, params api.GetLinksParams) {
+	links, err := api.linkRepo.GetLinks(params.TgChatId)
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, BadRequestParams, err.Error())
+		if errors.Is(err, uerrors.ErrChatNotExists) {
+			writeJSONError(w, http.StatusNotFound, ChatNotExists, err.Error())
+			return
+		}
+
+		writeJSONError(w, http.StatusInternalServerError, InternalServerError, err.Error())
 		return
 	}
 
+	var n int32 = int32(len(links))
+
+	linksResp := make([]rest.LinkResponse, n)
+	for ind, link := range links {
+		linksResp[ind] = rest.LinkResponse{
+			Id:      &link.ID,
+			Url:     &link.URL,
+			Tags:    &link.Tags,
+			Filters: &link.Filters,
+		}
+	}
+
+	resp := &rest.ListLinksResponse{
+		Links: &linksResp,
+		Size:  &n,
+	}
+
+	w.Header().Set("Content-Type", "json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (api *UpdatesAPI) PostLinks(w http.ResponseWriter, r *http.Request, params api.PostLinksParams) {
 	var link domain.Link
-	err = json.NewDecoder(r.Body).Decode(&link)
+	err := json.NewDecoder(r.Body).Decode(&link)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, BadRequestParams, err.Error())
 		return
@@ -167,7 +143,7 @@ func (api *UpdatesAPI) AddLink(w http.ResponseWriter, r *http.Request) {
 
 	link.UpdatedAt = update.UpdatedAt
 
-	id, err := api.linkRepo.AddLink(chatID, link)
+	id, err := api.linkRepo.AddLink(params.TgChatId, link)
 	if err != nil {
 		if errors.Is(err, uerrors.ErrChatNotExists) {
 			writeJSONError(w, http.StatusNotFound, ChatNotExists, err.Error())
@@ -180,42 +156,23 @@ func (api *UpdatesAPI) AddLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := domain.LinkResponse{
-		ID:      id,
-		URL:     link.URL,
-		Tags:    link.Tags,
-		Filters: link.Filters,
+	resp := &rest.LinkResponse{
+		Id:      &id,
+		Url:     &link.URL,
+		Tags:    &link.Tags,
+		Filters: &link.Filters,
 	}
 
+	w.Header().Set("Content-Type", "json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (api *UpdatesAPI) DeleteLink(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	chatIDStr := r.Header.Get("Tg-Chat-Id")
-	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
+func (api *UpdatesAPI) DeleteTgChatId(w http.ResponseWriter, r *http.Request, id int64) {
+	err := api.linkRepo.DeleteChat(id)
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, BadRequestParams, err.Error())
-		return
-	}
-
-	type Request struct {
-		Link string `json:"link"`
-	}
-
-	var req Request
-	err = json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, BadRequestParams, err.Error())
-		return
-	}
-
-	link, err := api.linkRepo.DeleteLink(chatID, req.Link)
-	if err != nil {
-		if errors.Is(err, uerrors.ErrChatNotExists) || errors.Is(err, uerrors.ErrLinkNotFound) {
-			writeJSONError(w, http.StatusNotFound, ChatNotExistsOrLinkNotFound, err.Error())
+		if errors.Is(err, uerrors.ErrChatNotExists) {
+			writeJSONError(w, http.StatusNotFound, ChatNotExists, err.Error())
 			return
 		}
 
@@ -223,13 +180,20 @@ func (api *UpdatesAPI) DeleteLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := domain.LinkResponse{
-		ID:      link.ID,
-		URL:     link.URL,
-		Tags:    link.Tags,
-		Filters: link.Filters,
+	w.WriteHeader(http.StatusOK)
+}
+
+func (api *UpdatesAPI) PostTgChatId(w http.ResponseWriter, r *http.Request, id int64) {
+	err := api.linkRepo.AddChat(id)
+	if err != nil {
+		if errors.Is(err, uerrors.ErrChatAlreadyExists) {
+			writeJSONError(w, http.StatusConflict, ChatAlreadyExists, err.Error())
+			return
+		}
+
+		writeJSONError(w, http.StatusInternalServerError, InternalServerError, err.Error())
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
 }

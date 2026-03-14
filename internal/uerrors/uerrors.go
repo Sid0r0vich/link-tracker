@@ -10,3 +10,4 @@ var ErrChatNotExistsOrLinkNotFound = errors.New("chat not exists or link not fou
 var ErrBadURL = errors.New("bad URL")
 var ErrTooManyRequests = errors.New("Too many requests")
 var ErrBadToken = errors.New("Too many requests")
+var ErrInternal = errors.New("Internal server error")

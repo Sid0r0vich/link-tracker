@@ -8,6 +8,7 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/gorilla/mux"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/adapter/scrapper"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/application"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/infrastructure"
@@ -88,17 +89,17 @@ func main() {
 		fx.Provide(
 			loadConfig,
 			logs.NewLogger,
-			func(cfg *Config) *infrastructure.BotToScrapper {
-				return infrastructure.NewScrapper(cfg.TrackerAddr)
+			func(cfg *Config) (*scrapper.ScrapperAdapterImpl, error) {
+				return scrapper.NewScrapperAdapterImpl(fmt.Sprintf("http://%s", cfg.TrackerAddr))
 			},
 			state_repository.NewInMemoryStateRepo,
 			func(
 				cfg *Config,
-				tracker *infrastructure.BotToScrapper,
+				scrapperAdapter *scrapper.ScrapperAdapterImpl,
 				stateRepo *state_repository.InMemoryStateRepo,
 				logger *slog.Logger,
 			) (*infrastructure.Bot, error) {
-				return infrastructure.NewBot(cfg.BotToken, tracker, stateRepo, logger)
+				return infrastructure.NewBot(cfg.BotToken, scrapperAdapter, stateRepo, logger)
 			},
 			func(b *infrastructure.Bot) application.API {
 				return b

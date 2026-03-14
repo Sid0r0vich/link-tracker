@@ -6,20 +6,20 @@ import (
 	"slices"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/adapter/scrapper"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/application"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
-	link_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
 	state_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/state"
 )
 
 type Bot struct {
-	API       *tgbotapi.BotAPI
-	stateRepo state_repository.StateRepository
-	logger    *slog.Logger
-	tracker   link_repository.LinkRepository
+	API             *tgbotapi.BotAPI
+	stateRepo       state_repository.StateRepository
+	logger          *slog.Logger
+	scrapperAdapter scrapper.ScrapperAdapter
 }
 
-func NewBot(token string, tracker link_repository.LinkRepository, stateRepo state_repository.StateRepository, logger *slog.Logger) (*Bot, error) {
+func NewBot(token string, scrapperAdapter scrapper.ScrapperAdapter, stateRepo state_repository.StateRepository, logger *slog.Logger) (*Bot, error) {
 	logger.Info("init bot")
 
 	api, err := tgbotapi.NewBotAPI(token)
@@ -27,7 +27,7 @@ func NewBot(token string, tracker link_repository.LinkRepository, stateRepo stat
 		logger.Error("failed to create bot", "error", err)
 		return nil, err
 	}
-	return &Bot{API: api, stateRepo: stateRepo, logger: logger, tracker: tracker}, nil
+	return &Bot{API: api, stateRepo: stateRepo, logger: logger, scrapperAdapter: scrapperAdapter}, nil
 }
 
 func (b *Bot) SetCommands(commands []tgbotapi.BotCommand) error {
@@ -111,15 +111,15 @@ func (b *Bot) SetTrackFilters(chatID int64, filters []string) error {
 }
 
 func (b *Bot) AddChat(chatID int64) error {
-	return b.tracker.AddChat(chatID)
+	return b.scrapperAdapter.AddChat(chatID)
 }
 
 func (b *Bot) DeleteChat(chatID int64) error {
-	return b.tracker.DeleteChat(chatID)
+	return b.scrapperAdapter.DeleteChat(chatID)
 }
 
 func (b *Bot) GetLinks(chatID int64, tag string) ([]domain.LinkWithID, error) {
-	allLinks, err := b.tracker.GetLinks(chatID)
+	allLinks, err := b.scrapperAdapter.GetLinks(chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (b *Bot) AddLink(chatID int64) error {
 		return fmt.Errorf("data must be BotTrackData")
 	}
 
-	_, err = b.tracker.AddLink(chatID, trackData.Link)
+	err = b.scrapperAdapter.AddLink(chatID, trackData.Link)
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func (b *Bot) DeleteLink(chatID int64) error {
 		return fmt.Errorf("data must be BotUntrackData")
 	}
 
-	_, err = b.tracker.DeleteLink(chatID, untrackData.URL)
+	err = b.scrapperAdapter.DeleteLink(chatID, untrackData.URL)
 	if err != nil {
 		return err
 	}

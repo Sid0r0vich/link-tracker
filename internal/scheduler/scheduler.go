@@ -50,7 +50,7 @@ func (b *Scheduler) LogError(err error) {
 func (s *Scheduler) Start() {
 	s.sched.Start()
 
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
 	for {
