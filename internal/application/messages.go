@@ -16,12 +16,12 @@ type MessageHandler struct {
 }
 
 func getStrs(str string) []string {
-	es := strings.Split(str, ",")
-	for ind, e := range es {
-		es[ind] = strings.TrimSpace(e)
+	data := strings.Split(str, ",")
+	for i, s := range data {
+		data[i] = strings.TrimSpace(s)
 	}
 
-	return es
+	return data
 }
 
 var StateToHandler = map[domain.BotState]MessageHandler{
@@ -29,8 +29,8 @@ var StateToHandler = map[domain.BotState]MessageHandler{
 		bot.Send(msg.Chat.ID, "Зайдите в меню, чтобы отправить команду")
 	}},
 	domain.LinkTrack: {Fun: func(bot API, msg *tgbotapi.Message) {
-		correct, err := utils.CheckLink(msg.Text)
-		if err != nil || !correct {
+		err := utils.CheckLink(msg.Text)
+		if err != nil {
 			bot.Send(msg.Chat.ID, "Некорректная ссылка")
 			return
 		}
@@ -71,6 +71,8 @@ var StateToHandler = map[domain.BotState]MessageHandler{
 				ans = "Некорректный токен"
 			} else if errors.Is(err, uerrors.ErrTooManyRequests) {
 				ans = "Слишком больше количество запросов"
+			} else {
+				ans = "Неизвестная ошибка"
 			}
 		}
 		bot.Send(msg.Chat.ID, ans)

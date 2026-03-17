@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/api/scrapper/rest"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers"
@@ -27,7 +29,7 @@ type Config struct {
 func loadConfig(logger *slog.Logger) (*Config, error) {
 	logger.Info("load config")
 
-	serverAddr := os.Getenv("SERVER_ADDR")
+	serverAddr := os.Getenv("SCRAPPER_SERVER_ADDR")
 	githubToken := os.Getenv("GITHUB_TOKEN")
 	botServerAddr := os.Getenv("BOT_SERVER_ADDR")
 	if serverAddr == "" || githubToken == "" || botServerAddr == "" {
@@ -39,7 +41,15 @@ func loadConfig(logger *slog.Logger) (*Config, error) {
 }
 
 func run(cfg *Config, api *handlers.UpdatesAPI, logger *slog.Logger, sched *scheduler.Scheduler) error {
-	go sched.Start()
+	sched.Start()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		logger.Info("interrupt signal received. Shutdown")
+		sched.Shutdown()
+	}()
 
 	opts := rest.StdHTTPServerOptions{}
 	handler := rest.HandlerWithOptions(api, opts)

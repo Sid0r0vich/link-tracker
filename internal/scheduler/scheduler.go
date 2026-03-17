@@ -43,75 +43,75 @@ func NewScheduler(
 	}, nil
 }
 
-func (b *Scheduler) LogError(err error) {
-	b.logger.Error("scheduler:", "error", err)
+func (s *Scheduler) LogError(err error) {
+	s.logger.Error("scheduler:", "error", err)
 }
 
-func (s *Scheduler) Start() {
-	s.sched.Start()
+func (s *Scheduler) checkLinkUpdates(url string, linkUpd domain.LinkUpdate) {
+	update, err := s.scrapper.GetUpdate(url)
+	if err != nil {
+		s.LogError(fmt.Errorf("get updates from scrapper: %w", err))
+		return
+	}
 
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
+	needToUpdate, err := s.linkRepo.GetTimeAndUpdateLink(update.URL, update.UpdatedAt)
+	if err != nil {
+		s.LogError(fmt.Errorf("get link update time: %w", err))
+		return
+	}
 
-	for {
-		select {
-		case <-s.ctx.Done():
-			s.sched.Shutdown()
-			return
+	if !needToUpdate {
+		return
+	}
 
-		case <-ticker.C:
-			links, err := s.linkRepo.GetAllLinks()
-			if err != nil {
-				s.LogError(fmt.Errorf("get all links: %w", err))
-				break
-			}
+	tgChatUpdateIDs := make([]int64, len(linkUpd.IDs))
+	cnt := 0
+	for k := range linkUpd.IDs {
+		tgChatUpdateIDs[cnt] = k
+		cnt++
+	}
 
-			checkLinkUpdates := func(url string, linkUpd domain.LinkUpdate) {
-				update, err := s.scrapper.GetUpdate(url)
-				if err != nil {
-					s.LogError(fmt.Errorf("get updates from scrapper: %w", err))
-					return
-				}
+	data := domain.UpdateResponse{
+		ID:        update.ID,
+		URL:       update.URL,
+		Desc:      update.Desc,
+		TgChatIds: tgChatUpdateIDs,
+	}
+	if err := s.updater.SendUpdate(&data); err != nil {
+		s.LogError(fmt.Errorf("send update to bot: %w", err))
+	}
+}
 
-				needToUpdate, err := s.linkRepo.GetTimeAndUpdateLink(update.URL, update.UpdatedAt)
-				if err != nil {
-					s.LogError(fmt.Errorf("get link update time: %w", err))
-					return
-				}
+func (s *Scheduler) checkUpdates() error {
+	links, err := s.linkRepo.GetAllLinks()
+	if err != nil {
+		s.LogError(fmt.Errorf("get all links: %w", err))
+		return fmt.Errorf("get all links: %w", err)
+	}
 
-				if !needToUpdate {
-					return
-				}
-
-				tgChatUpdateIDs := make([]int64, len(linkUpd.IDs))
-				cnt := 0
-				for k := range linkUpd.IDs {
-					tgChatUpdateIDs[cnt] = k
-					cnt++
-				}
-
-				data := domain.UpdateResponse{
-					ID:        update.ID,
-					URL:       update.URL,
-					Desc:      update.Desc,
-					TgChatIds: tgChatUpdateIDs,
-				}
-				if err := s.updater.SendUpdate(&data); err != nil {
-					s.LogError(fmt.Errorf("send update to bot: %w", err))
-				}
-			}
-
-			for url, linkUpd := range links {
-				_, err := s.sched.NewJob(
-					gocron.DurationJob(
-						10*time.Second,
-					),
-					gocron.NewTask(checkLinkUpdates, url, linkUpd),
-				)
-				if err != nil {
-					s.LogError(fmt.Errorf("creating job: %w", err))
-				}
-			}
+	for url, linkUpd := range links {
+		s.checkLinkUpdates(url, linkUpd)
+		if err != nil {
+			s.LogError(fmt.Errorf("creating job: %w", err))
 		}
 	}
+
+	return nil
+}
+
+func (s *Scheduler) Start() error {
+	_, err := s.sched.NewJob(
+		gocron.DurationJob(10*time.Second),
+		gocron.NewTask(s.checkUpdates),
+	)
+	if err != nil {
+		return err
+	}
+
+	s.sched.Start()
+	return nil
+}
+
+func (s *Scheduler) Shutdown() error {
+	return s.sched.Shutdown()
 }

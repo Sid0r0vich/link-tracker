@@ -10,7 +10,7 @@ import (
 
 type InMemoryLinkRepo struct {
 	*sync.RWMutex
-	urlToLink       map[int64]map[string]domain.LinkInfoWithID
+	urlToChatLinks  map[int64]map[string]domain.LinkInfoWithID
 	size            int64
 	urlToLinkUpdate map[string]domain.LinkUpdate
 }
@@ -18,7 +18,7 @@ type InMemoryLinkRepo struct {
 func NewInMemoryLinkRepo() *InMemoryLinkRepo {
 	return &InMemoryLinkRepo{
 		RWMutex:         &sync.RWMutex{},
-		urlToLink:       make(map[int64]map[string]domain.LinkInfoWithID),
+		urlToChatLinks:  make(map[int64]map[string]domain.LinkInfoWithID),
 		urlToLinkUpdate: make(map[string]domain.LinkUpdate),
 	}
 }
@@ -27,11 +27,11 @@ func (r *InMemoryLinkRepo) AddChat(chatID int64) error {
 	r.Lock()
 	defer r.Unlock()
 
-	if _, ok := r.urlToLink[chatID]; ok {
+	if _, ok := r.urlToChatLinks[chatID]; ok {
 		return uerrors.ErrChatAlreadyExists
 	}
 
-	r.urlToLink[chatID] = make(map[string]domain.LinkInfoWithID, 0)
+	r.urlToChatLinks[chatID] = make(map[string]domain.LinkInfoWithID, 0)
 
 	return nil
 }
@@ -40,11 +40,11 @@ func (r *InMemoryLinkRepo) DeleteChat(chatID int64) error {
 	r.Lock()
 	defer r.Unlock()
 
-	if _, ok := r.urlToLink[chatID]; !ok {
+	if _, ok := r.urlToChatLinks[chatID]; !ok {
 		return uerrors.ErrChatNotExists
 	}
 
-	delete(r.urlToLink, chatID)
+	delete(r.urlToChatLinks, chatID)
 
 	return nil
 }
@@ -53,7 +53,7 @@ func (r *InMemoryLinkRepo) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 	r.RLock()
 	defer r.RUnlock()
 
-	chat, ok := r.urlToLink[chatID]
+	chat, ok := r.urlToChatLinks[chatID]
 	if !ok {
 		return []domain.LinkWithID{}, uerrors.ErrChatNotExists
 	}
@@ -72,7 +72,7 @@ func (r *InMemoryLinkRepo) AddLink(chatID int64, link domain.Link) (int64, error
 	r.Lock()
 	defer r.Unlock()
 
-	chat, ok := r.urlToLink[chatID]
+	chat, ok := r.urlToChatLinks[chatID]
 	if !ok {
 		return 0, uerrors.ErrChatNotExists
 	}
@@ -99,7 +99,7 @@ func (r *InMemoryLinkRepo) DeleteLink(chatID int64, url string) (*domain.LinkWit
 	r.Lock()
 	defer r.Unlock()
 
-	chat, ok := r.urlToLink[chatID]
+	chat, ok := r.urlToChatLinks[chatID]
 	if !ok {
 		return nil, uerrors.ErrChatNotExists
 	}
@@ -133,7 +133,7 @@ func (r *InMemoryLinkRepo) CheckLinkExists(chatID int64, url string) (bool, erro
 	r.RLock()
 	defer r.RUnlock()
 
-	chat, ok := r.urlToLink[chatID]
+	chat, ok := r.urlToChatLinks[chatID]
 	if !ok {
 		return false, nil
 	}

@@ -28,7 +28,7 @@ func loadConfig(logger *slog.Logger) (*Config, error) {
 	logger.Info("load config")
 
 	botToken := os.Getenv("BOT_TOKEN")
-	trackerAddr := os.Getenv("SERVER_ADDR")
+	trackerAddr := os.Getenv("SCRAPPER_SERVER_ADDR")
 	botServerAddr := os.Getenv("BOT_SERVER_ADDR")
 	if botToken == "" || trackerAddr == "" || botServerAddr == "" {
 		logger.Error("fail to load config", "error", "empty value")
