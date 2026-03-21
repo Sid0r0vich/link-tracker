@@ -23,7 +23,7 @@ func (api *BotUpdatesApi) GetUpdate(w http.ResponseWriter, r *http.Request) {
 	var req domain.UpdateResponse
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, BadRequestParams, err.Error())
+		writeJSONError(w, &ErrBadRequest{err: err})
 		return
 	}
 

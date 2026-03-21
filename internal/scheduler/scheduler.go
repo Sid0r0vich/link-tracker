@@ -47,21 +47,19 @@ func (s *Scheduler) LogError(err error) {
 	s.logger.Error("scheduler:", "error", err)
 }
 
-func (s *Scheduler) checkLinkUpdates(url string, linkUpd domain.LinkUpdate) {
+func (s *Scheduler) checkLinkUpdates(url string, linkUpd domain.LinkUpdate) error {
 	update, err := s.scrapper.GetUpdate(url)
 	if err != nil {
-		s.LogError(fmt.Errorf("get updates from scrapper: %w", err))
-		return
+		return fmt.Errorf("get updates from scrapper: %w", err)
 	}
 
 	needToUpdate, err := s.linkRepo.GetTimeAndUpdateLink(update.URL, update.UpdatedAt)
 	if err != nil {
-		s.LogError(fmt.Errorf("get link update time: %w", err))
-		return
+		return fmt.Errorf("get link update time: %w", err)
 	}
 
 	if !needToUpdate {
-		return
+		return nil
 	}
 
 	tgChatUpdateIDs := make([]int64, len(linkUpd.IDs))
@@ -78,8 +76,9 @@ func (s *Scheduler) checkLinkUpdates(url string, linkUpd domain.LinkUpdate) {
 		TgChatIds: tgChatUpdateIDs,
 	}
 	if err := s.updater.SendUpdate(&data); err != nil {
-		s.LogError(fmt.Errorf("send update to bot: %w", err))
+		return fmt.Errorf("send update to bot: %w", err)
 	}
+	return nil
 }
 
 func (s *Scheduler) checkUpdates() error {
@@ -90,9 +89,9 @@ func (s *Scheduler) checkUpdates() error {
 	}
 
 	for url, linkUpd := range links {
-		s.checkLinkUpdates(url, linkUpd)
+		err = s.checkLinkUpdates(url, linkUpd)
 		if err != nil {
-			s.LogError(fmt.Errorf("creating job: %w", err))
+			s.LogError(fmt.Errorf("check link updates: %w", err))
 		}
 	}
 
@@ -101,7 +100,7 @@ func (s *Scheduler) checkUpdates() error {
 
 func (s *Scheduler) Start() error {
 	_, err := s.sched.NewJob(
-		gocron.DurationJob(10*time.Second),
+		gocron.DurationJob(30*time.Second),
 		gocron.NewTask(s.checkUpdates),
 	)
 	if err != nil {
