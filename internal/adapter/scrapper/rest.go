@@ -70,16 +70,7 @@ func (s *ScrapperAdapterImpl) GetLinks(chatID int64) ([]domain.LinkWithID, error
 	case http.StatusOK:
 		links := make([]domain.LinkWithID, len(*resp.JSON200.Links))
 		for idx, link := range *resp.JSON200.Links {
-			links[idx] = domain.LinkWithID{
-				Link: domain.Link{
-					LinkInfo: domain.LinkInfo{
-						Tags:    *link.Tags,
-						Filters: *link.Filters,
-					},
-					URL: *link.Url,
-				},
-				ID: *link.Id,
-			}
+			links[idx] = *domain.LinkResponseToLinkWithID(&link)
 		}
 
 		return links, nil

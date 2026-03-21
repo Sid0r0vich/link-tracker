@@ -61,7 +61,7 @@ func (r *InMemoryLinkRepo) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 	links := make([]domain.LinkWithID, len(chat))
 	cnt := 0
 	for url, link := range chat {
-		links[cnt] = domain.LinkWithID{Link: domain.Link{URL: url, LinkInfo: link.LinkInfo}, ID: link.ID}
+		links[cnt] = *domain.LinkInfoWithIDToLinkWithID(&link, url)
 		cnt++
 	}
 
@@ -117,16 +117,7 @@ func (r *InMemoryLinkRepo) DeleteLink(chatID int64, url string) (*domain.LinkWit
 		r.urlToLinkUpdate[url] = linkUpd
 	}
 
-	return &domain.LinkWithID{
-		Link: domain.Link{
-			LinkInfo: domain.LinkInfo{
-				Tags:    link.Tags,
-				Filters: link.Filters,
-			},
-			URL: url,
-		},
-		ID: link.ID,
-	}, nil
+	return domain.LinkInfoWithIDToLinkWithID(&link, url), nil
 }
 
 func (r *InMemoryLinkRepo) CheckLinkExists(chatID int64, url string) (bool, error) {

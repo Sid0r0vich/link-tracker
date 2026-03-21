@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/api/scrapper/rest"
 	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/api/scrapper/rest"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
@@ -16,16 +15,49 @@ import (
 )
 
 const (
-	BadRequestParams            = "Некорректные параметры запроса"
-	ChatAlreadyExists           = "Чат уже существует"
-	ChatNotExists               = "Чат не существует"
-	LinkAlreadyExists           = "Ссылка уже отслеживается"
-	InternalServerError         = "Внутренняя ошибка"
-	ChatNotExistsOrLinkNotFound = "Чат не существует или ссылка не найдена"
+	BadRequestParams    = "Некорректные параметры запроса"
+	ChatAlreadyExists   = "Чат уже существует"
+	ChatNotExists       = "Чат не существует"
+	LinkAlreadyExists   = "Ссылка уже отслеживается"
+	InternalServerError = "Внутренняя ошибка"
+	LinkNotFound        = "Ссылка не найдена"
 )
 
-func writeJSONError(w http.ResponseWriter, code int, description string, msg string) {
-	writeJSONErrorWithCode(w, code, "", description, msg)
+type ErrBadRequest struct {
+	err error
+}
+
+func (errDecode ErrBadRequest) Error() string {
+	return fmt.Sprintf("decode json: %v", errDecode.err)
+}
+
+func writeJSONError(w http.ResponseWriter, err error) {
+	var code int
+	var description string
+	errBadReq := ErrBadRequest{}
+
+	switch {
+	case errors.Is(err, uerrors.ErrLinkNotFound):
+		code = http.StatusNotFound
+		description = LinkNotFound
+	case errors.Is(err, uerrors.ErrChatNotExists):
+		code = http.StatusNotFound
+		description = ChatNotExists
+	case errors.As(err, &errBadReq):
+		code = http.StatusBadRequest
+		description = BadRequestParams
+	case errors.Is(err, uerrors.ErrLinkAlreadyExists):
+		code = http.StatusConflict
+		description = LinkAlreadyExists
+	case errors.Is(err, uerrors.ErrChatAlreadyExists):
+		code = http.StatusConflict
+		description = ChatAlreadyExists
+	default:
+		code = http.StatusInternalServerError
+		description = InternalServerError
+	}
+
+	writeJSONErrorWithCode(w, code, "", description, err.Error())
 }
 
 func writeJSONErrorWithCode(w http.ResponseWriter, code int, error_code string, description string, msg string) {
@@ -65,18 +97,13 @@ func (api *UpdatesAPI) DeleteLinks(w http.ResponseWriter, r *http.Request, param
 	var req Request
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, BadRequestParams, err.Error())
+		writeJSONError(w, &ErrBadRequest{err: err})
 		return
 	}
 
 	link, err := api.linkRepo.DeleteLink(params.TgChatId, req.Link)
 	if err != nil {
-		if errors.Is(err, uerrors.ErrChatNotExists) || errors.Is(err, uerrors.ErrLinkNotFound) {
-			writeJSONError(w, http.StatusNotFound, ChatNotExistsOrLinkNotFound, err.Error())
-			return
-		}
-
-		writeJSONError(w, http.StatusInternalServerError, InternalServerError, err.Error())
+		writeJSONError(w, err)
 		return
 	}
 
@@ -95,12 +122,7 @@ func (api *UpdatesAPI) DeleteLinks(w http.ResponseWriter, r *http.Request, param
 func (api *UpdatesAPI) GetLinks(w http.ResponseWriter, r *http.Request, params api.GetLinksParams) {
 	links, err := api.linkRepo.GetLinks(params.TgChatId)
 	if err != nil {
-		if errors.Is(err, uerrors.ErrChatNotExists) {
-			writeJSONError(w, http.StatusNotFound, ChatNotExists, err.Error())
-			return
-		}
-
-		writeJSONError(w, http.StatusInternalServerError, InternalServerError, err.Error())
+		writeJSONError(w, err)
 		return
 	}
 
@@ -108,12 +130,7 @@ func (api *UpdatesAPI) GetLinks(w http.ResponseWriter, r *http.Request, params a
 
 	linksResp := make([]rest.LinkResponse, n)
 	for ind, link := range links {
-		linksResp[ind] = rest.LinkResponse{
-			Id:      &link.ID,
-			Url:     &link.URL,
-			Tags:    &link.Tags,
-			Filters: &link.Filters,
-		}
+		linksResp[ind] = *domain.LinkWithIDToLinkResponse(&link)
 	}
 
 	resp := &rest.ListLinksResponse{
@@ -130,7 +147,7 @@ func (api *UpdatesAPI) PostLinks(w http.ResponseWriter, r *http.Request, params 
 	var link domain.Link
 	err := json.NewDecoder(r.Body).Decode(&link)
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, BadRequestParams, err.Error())
+		writeJSONError(w, err)
 		return
 	}
 
@@ -145,15 +162,7 @@ func (api *UpdatesAPI) PostLinks(w http.ResponseWriter, r *http.Request, params 
 
 	id, err := api.linkRepo.AddLink(params.TgChatId, link)
 	if err != nil {
-		if errors.Is(err, uerrors.ErrChatNotExists) {
-			writeJSONError(w, http.StatusNotFound, ChatNotExists, err.Error())
-		} else if errors.Is(err, uerrors.ErrLinkAlreadyExists) {
-			writeJSONError(w, http.StatusConflict, LinkAlreadyExists, err.Error())
-		} else {
-			writeJSONError(w, http.StatusInternalServerError, InternalServerError, err.Error())
-		}
-
-		return
+		writeJSONError(w, err)
 	}
 
 	resp := &rest.LinkResponse{
@@ -171,12 +180,7 @@ func (api *UpdatesAPI) PostLinks(w http.ResponseWriter, r *http.Request, params 
 func (api *UpdatesAPI) DeleteTgChatId(w http.ResponseWriter, r *http.Request, id int64) {
 	err := api.linkRepo.DeleteChat(id)
 	if err != nil {
-		if errors.Is(err, uerrors.ErrChatNotExists) {
-			writeJSONError(w, http.StatusNotFound, ChatNotExists, err.Error())
-			return
-		}
-
-		writeJSONError(w, http.StatusInternalServerError, InternalServerError, err.Error())
+		writeJSONError(w, err)
 		return
 	}
 
@@ -186,12 +190,7 @@ func (api *UpdatesAPI) DeleteTgChatId(w http.ResponseWriter, r *http.Request, id
 func (api *UpdatesAPI) PostTgChatId(w http.ResponseWriter, r *http.Request, id int64) {
 	err := api.linkRepo.AddChat(id)
 	if err != nil {
-		if errors.Is(err, uerrors.ErrChatAlreadyExists) {
-			writeJSONError(w, http.StatusConflict, ChatAlreadyExists, err.Error())
-			return
-		}
-
-		writeJSONError(w, http.StatusInternalServerError, InternalServerError, err.Error())
+		writeJSONError(w, err)
 		return
 	}
 
