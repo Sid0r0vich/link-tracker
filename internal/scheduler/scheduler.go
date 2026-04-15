@@ -8,25 +8,31 @@ import (
 
 	"github.com/go-co-op/gocron/v2"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/infrastructure"
 	link_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
-	scrapper_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/scrapper"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/update"
+	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
 
+type Scrapper interface {
+	GetUpdate(string) (*domain.Update, error)
+}
+
 type Scheduler struct {
-	ctx      context.Context
-	linkRepo link_repository.LinkUpdateRepository
-	logger   *slog.Logger
-	updater  *infrastructure.Updater
-	scrapper scrapper_repository.Scrapper
-	sched    gocron.Scheduler
+	ctx              context.Context
+	linkRepo         link_repository.LinkUpdateRepository
+	logger           *slog.Logger
+	updater          *update.UpdateService
+	scrapper         Scrapper
+	sched            gocron.Scheduler
+	jobDelayInterval time.Duration
 }
 
 func NewScheduler(
 	linkRepo link_repository.LinkUpdateRepository,
 	logger *slog.Logger,
-	updater *infrastructure.Updater,
-	scrapper scrapper_repository.Scrapper,
+	updater *update.UpdateService,
+	scrapper Scrapper,
+	jobDelayInterval time.Duration,
 ) (*Scheduler, error) {
 	sched, err := gocron.NewScheduler()
 	if err != nil {
@@ -34,62 +40,60 @@ func NewScheduler(
 	}
 
 	return &Scheduler{
-		ctx:      context.Background(),
-		linkRepo: linkRepo,
-		logger:   logger,
-		updater:  updater,
-		scrapper: scrapper,
-		sched:    sched,
+		ctx:              context.Background(),
+		linkRepo:         linkRepo,
+		logger:           logger,
+		updater:          updater,
+		scrapper:         scrapper,
+		sched:            sched,
+		jobDelayInterval: jobDelayInterval,
 	}, nil
 }
 
 func (s *Scheduler) LogError(err error) {
-	s.logger.Error("scheduler:", "error", err)
+	s.logger.Error("scheduler", "error", err)
 }
 
-func (s *Scheduler) checkLinkUpdates(url string, linkUpd domain.LinkUpdate) error {
-	update, err := s.scrapper.GetUpdate(url)
+func (s *Scheduler) checkLinkUpdates(lurl string, linkUpd domain.LinkUpdate) error {
+	s.logger.Info("checking link updates", "url", lurl)
+	update, err := s.scrapper.GetUpdate(lurl)
 	if err != nil {
 		return fmt.Errorf("get updates from scrapper: %w", err)
 	}
 
-	needToUpdate, err := s.linkRepo.GetTimeAndUpdateLink(update.URL, update.UpdatedAt)
+	oldUpdatedAt, err := s.linkRepo.GetTimeAndUpdateLink(lurl, update.UpdatedAt)
 	if err != nil {
+		s.logger.Error(fmt.Sprintf("get time and update link: %v", err))
 		return fmt.Errorf("get link update time: %w", err)
 	}
 
-	if !needToUpdate {
+	if !oldUpdatedAt.Before(update.UpdatedAt) {
 		return nil
 	}
 
-	tgChatUpdateIDs := make([]int64, len(linkUpd.IDs))
-	cnt := 0
-	for k := range linkUpd.IDs {
-		tgChatUpdateIDs[cnt] = k
-		cnt++
+	res := api.UpdateResponse{
+		Id:        update.ID,
+		Url:       update.URL,
+		TgChatIds: linkUpd.IDs,
 	}
-
-	data := domain.UpdateResponse{
-		ID:        update.ID,
-		URL:       update.URL,
-		Desc:      update.Desc,
-		TgChatIds: tgChatUpdateIDs,
-	}
-	if err := s.updater.SendUpdate(&data); err != nil {
+	if err := s.updater.SendUpdate(&res); err != nil {
 		return fmt.Errorf("send update to bot: %w", err)
 	}
 	return nil
 }
 
-func (s *Scheduler) checkUpdates() error {
+func (s *Scheduler) CheckUpdates() error {
 	links, err := s.linkRepo.GetAllLinks()
 	if err != nil {
-		s.LogError(fmt.Errorf("get all links: %w", err))
-		return fmt.Errorf("get all links: %w", err)
+		s.LogError(fmt.Errorf("get links: %w", err))
 	}
 
-	for url, linkUpd := range links {
-		err = s.checkLinkUpdates(url, linkUpd)
+	if len(links) == 0 {
+		return nil
+	}
+
+	for _, linkUpd := range links {
+		err = s.checkLinkUpdates(linkUpd.URL, linkUpd)
 		if err != nil {
 			s.LogError(fmt.Errorf("check link updates: %w", err))
 		}
@@ -100,8 +104,8 @@ func (s *Scheduler) checkUpdates() error {
 
 func (s *Scheduler) Start() error {
 	_, err := s.sched.NewJob(
-		gocron.DurationJob(30*time.Second),
-		gocron.NewTask(s.checkUpdates),
+		gocron.DurationJob(s.jobDelayInterval),
+		gocron.NewTask(s.CheckUpdates),
 	)
 	if err != nil {
 		return err

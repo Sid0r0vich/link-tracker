@@ -1,65 +1,59 @@
 syntax = "proto3";
 
-option go_package = "internal/api/scrapper/gRPC";
+package scrapper;
 
-package scrapperapi;
+option go_package = "internal/api/rpc/rpc";
 
-import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
 
-message DeleteLinksRequest {
-    int64 Tg_Chat_Id = 1;
+message RegisterChatRequest {
+  int64 id = 1;
 }
 
-message DeleteTgChatIdRequest {
-    int64 id = 1;
+message DeleteChatRequest {
+  int64 id = 1;
 }
 
 message GetLinksRequest {
-    int64 Tg_Chat_Id = 1;
+  int64 tg_chat_id = 1;
 }
 
-message PostLinksRequest {
-    int64 Tg_Chat_Id = 1;
+message ListLinksResponse {
+  repeated LinkResponse links = 1;
+  int32 size = 2;
 }
 
-message PostTgChatIdRequest {
-    int64 id = 1;
+message AddLinkRequest {
+  int64 tg_chat_id = 1;
+  string url = 2;
+  repeated string tags = 3;
+  repeated string filters = 4;
 }
 
-service ScrapperAPIService {
-    // Убрать отслеживание ссылки
-    rpc DeleteLinks(DeleteLinksRequest) returns (google.protobuf.Empty) {
-        option (google.api.http) = {
-            delete: "/links"
-        };
-    }
+message RemoveLinkRequest {
+  int64 tg_chat_id = 1;
+  string link = 2;
+}
 
-    // Удалить чат
-    rpc DeleteTgChatId(DeleteTgChatIdRequest) returns (google.protobuf.Empty) {
-        option (google.api.http) = {
-            delete: "/tg-chat/{id}"
-        };
-    }
+message ApiErrorResponse {
+  string description = 1;
+  string code = 2;
+  string exceptionName = 3;
+  string exceptionMessage = 4;
+  repeated string stacktrace = 5;
+}
 
-    // Получить все отслеживаемые ссылки
-    rpc GetLinks(GetLinksRequest) returns (google.protobuf.Empty) {
-        option (google.api.http) = {
-            get: "/links"
-        };
-    }
+message LinkResponse {
+  int64 id = 1;
+  string url = 2;
+  repeated string tags = 3;
+  repeated string filters = 4;
+}
 
-    // Добавить отслеживание ссылки
-    rpc PostLinks(PostLinksRequest) returns (google.protobuf.Empty) {
-        option (google.api.http) = {
-            post: "/links"
-        };
-    }
-
-    // Зарегистрировать чат
-    rpc PostTgChatId(PostTgChatIdRequest) returns (google.protobuf.Empty) {
-        option (google.api.http) = {
-            post: "/tg-chat/{id}"
-        };
-    }
+service ScrapperAPI {
+  rpc RegisterChat (RegisterChatRequest) returns (google.protobuf.Empty);
+  rpc DeleteChat (DeleteChatRequest) returns (google.protobuf.Empty);
+  rpc GetLinks (GetLinksRequest) returns (ListLinksResponse);
+  rpc AddLink (AddLinkRequest) returns (LinkResponse);
+  rpc RemoveLink (RemoveLinkRequest) returns (LinkResponse);
 }

@@ -1,0 +1,22 @@
+database:
+  host: db
+  port: 5432
+  username: postgres
+  password: pwd
+  name: link-tracker
+  max_conns: 8
+  min_conns: 2
+  max_conn_idle_time_mins: 5
+  max_conn_life_time_mins: 30
+
+bot:
+  token: your-bot-token
+  server_addr: link-tracker-bot:1235
+
+scrapper:
+  server_addr: link-tracker-scrapper:1234
+  github_token: your-github-token
+  stackoverflow_key: your-stackoverflow-key
+  db_access_type: SQL
+  transport_protocol: HTTP
+  job_delay_interval_seconds: 30

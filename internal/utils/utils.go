@@ -1,8 +1,12 @@
 package utils
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -25,4 +29,21 @@ func CheckLink(url string) error {
 	}
 
 	return nil
+}
+
+func CutDescription(description string, maxLen int) string {
+	return description[:min(len(description), maxLen)]
+}
+
+func IsNetError(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, os.ErrDeadlineExceeded) {
+		return true
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+
+	return false
 }

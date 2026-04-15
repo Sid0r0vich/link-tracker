@@ -1,60 +1,43 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/gorilla/mux"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/adapter/scrapper"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/application"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/infrastructure"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/chat"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
+	handlers "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/rest"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/logs"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/middleware"
 	state_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/state"
 	"go.uber.org/fx"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-type Config struct {
-	BotToken      string
-	TrackerAddr   string
-	BotServerAddr string
-}
-
-func loadConfig(logger *slog.Logger) (*Config, error) {
-	logger.Info("load config")
-
-	botToken := os.Getenv("BOT_TOKEN")
-	trackerAddr := os.Getenv("SCRAPPER_SERVER_ADDR")
-	botServerAddr := os.Getenv("BOT_SERVER_ADDR")
-	if botToken == "" || trackerAddr == "" || botServerAddr == "" {
-		logger.Error("fail to load config", "error", "empty value")
-		return nil, fmt.Errorf("environment error")
-	}
-
-	return &Config{BotToken: botToken, TrackerAddr: trackerAddr, BotServerAddr: botServerAddr}, nil
-}
-
-func startServer(cfg *Config, api *handlers.BotUpdatesApi, logger *slog.Logger) {
+func startServer(cfg *config.Config, api *handlers.BotRestServer, logger *slog.Logger) {
 	r := mux.NewRouter()
 	r.HandleFunc("/updates", api.GetUpdate).Methods("POST")
 
-	err := http.ListenAndServe(cfg.BotServerAddr, middleware.LoggingMiddleware(r, logger))
+	err := http.ListenAndServe(cfg.Bot.ServerAddr, middleware.LoggingMiddleware(r, logger))
 	if err != nil {
 		logger.Error("fail to start server", "error", err)
 	}
 }
 
-func run(cfg *Config, bot *infrastructure.Bot, logger *slog.Logger, api *handlers.BotUpdatesApi) error {
-	botCommands := make([]tgbotapi.BotCommand, 0, len(application.CmdToHandler))
-	for name, command := range application.CmdToHandler {
+func run(cfg *config.Config, chatController *chat.ChatController, logger *slog.Logger, api *handlers.BotRestServer) error {
+	botCommands := make([]tgbotapi.BotCommand, 0, len(bot.CmdToHandler))
+	for name, command := range bot.CmdToHandler {
 		botCommands = append(botCommands, tgbotapi.BotCommand{Command: name, Description: command.Desc})
 	}
 	logger.Info("set command", "count", len(botCommands))
-	err := bot.SetCommands(botCommands)
+	err := chatController.SetCommands(botCommands)
 	if err != nil {
 		logger.Error("fail to set commands", "error", err)
 	}
@@ -63,20 +46,20 @@ func run(cfg *Config, bot *infrastructure.Bot, logger *slog.Logger, api *handler
 		startServer(cfg, api, logger)
 	}()
 
-	updates := bot.GetUpdatesChan()
+	updates := chatController.GetUpdatesChan()
 	logger.Info("get updates")
 	for update := range updates {
 		if update.Message == nil {
-			bot.LogError(fmt.Errorf("nil message"))
+			chatController.LogError(fmt.Errorf("nil message"))
 			continue
 		}
 
 		if update.Message.IsCommand() {
 			logger.Info("get command", "command", update.Message.Command(), "chat_id", update.Message.Chat.ID)
-			_ = application.HandleCommand(bot, update.Message)
+			_ = bot.HandleCommand(chatController, update.Message)
 		} else {
 			logger.Info("get message", "message", update.Message.Text, "chat_id", update.Message.Chat.ID)
-			_ = application.HandleMessage(bot, update.Message)
+			_ = bot.HandleMessage(chatController, update.Message)
 		}
 	}
 
@@ -87,21 +70,42 @@ func main() {
 	fx.New(
 		//fx.NopLogger,
 		fx.Provide(
-			loadConfig,
+			config.LoadConfig,
 			logs.NewLogger,
-			func(cfg *Config) (*scrapper.ScrapperAdapterImpl, error) {
-				return scrapper.NewScrapperAdapterImpl(fmt.Sprintf("http://%s", cfg.TrackerAddr))
+			func(cfg *config.Config, lifecycle fx.Lifecycle, logger *slog.Logger) (scrapper.ScrapperAdapter, error) {
+				switch cfg.Scrapper.TransportProtocol {
+				case config.TransportProtocolHTTP:
+					return scrapper.NewScrapperAdapterImpl(fmt.Sprintf("http://%s", cfg.Scrapper.ServerAddr))
+
+				case config.TransportProtocolGRPC:
+					conn, err := grpc.NewClient("link-tracker-scrapper:1234", grpc.WithTransportCredentials(insecure.NewCredentials()))
+					if err != nil {
+						return nil, fmt.Errorf("failed to connect to scrapper: %v", err)
+					}
+
+					lifecycle.Append(fx.Hook{
+						OnStop: func(context.Context) error {
+							conn.Close()
+							logger.Info("grpc connection closed")
+							return nil
+						},
+					})
+
+					return scrapper.NewScrapperAdapterRPC(conn)
+				}
+
+				return nil, fmt.Errorf("invalid transport protocol: %s", cfg.Scrapper.TransportProtocol)
 			},
 			state_repository.NewInMemoryStateRepo,
 			func(
-				cfg *Config,
-				scrapperAdapter *scrapper.ScrapperAdapterImpl,
+				cfg *config.Config,
+				scrapperAdapter scrapper.ScrapperAdapter,
 				stateRepo *state_repository.InMemoryStateRepo,
 				logger *slog.Logger,
-			) (*infrastructure.Bot, error) {
-				return infrastructure.NewBot(cfg.BotToken, scrapperAdapter, stateRepo, logger)
+			) (*chat.ChatController, error) {
+				return chat.NewChatController(cfg.Bot.Token, scrapperAdapter, stateRepo, logger)
 			},
-			func(b *infrastructure.Bot) application.API {
+			func(b *chat.ChatController) bot.API {
 				return b
 			},
 			handlers.NewBotUpdatesApi,

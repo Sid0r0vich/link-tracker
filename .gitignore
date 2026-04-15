@@ -1,2 +1,5 @@
 .env
 bin/*
+
+coverage.out
+config.yaml

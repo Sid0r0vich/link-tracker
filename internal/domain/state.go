@@ -1,38 +1,38 @@
 package domain
 
-type BotState int
+type ChatState int
 
 const (
-	Wait BotState = iota
+	Wait ChatState = iota
 	LinkTrack
 	TagsTrack
 	FilterTrack
 	LinkUntrack
 )
 
-type BotData interface {
-	GetState() BotState
-	SetState(BotState)
+type ChatData interface {
+	GetState() ChatState
+	SetState(ChatState)
 }
 
-type BotSimpleData struct {
-	State BotState
+type ChatSimpleData struct {
+	State ChatState
 }
 
-func (d BotSimpleData) GetState() BotState {
+func (d ChatSimpleData) GetState() ChatState {
 	return d.State
 }
 
-func (d BotSimpleData) SetState(s BotState) {
+func (d ChatSimpleData) SetState(s ChatState) {
 	d.State = s
 }
 
-type BotTrackData struct {
-	BotSimpleData
+type ChatTrackData struct {
+	ChatSimpleData
 	Link Link
 }
 
-type BotUntrackData struct {
-	BotSimpleData
+type ChatUntrackData struct {
+	ChatSimpleData
 	URL string
 }

@@ -1,10 +1,11 @@
 package domain
 
-import "time"
+import (
+	"time"
+)
 
 type Update struct {
 	ID        int64
 	URL       string
-	Desc      string
 	UpdatedAt time.Time
 }

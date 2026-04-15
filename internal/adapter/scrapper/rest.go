@@ -2,16 +2,18 @@ package scrapper
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/api/scrapper/rest"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/uerrors"
+	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/scrapper/rest"
 )
 
 type ScrapperAdapterImpl struct {
-	client rest.ClientWithResponsesInterface
+	Client rest.ClientWithResponsesInterface
 }
 
 func NewScrapperAdapterImpl(baseURL string) (*ScrapperAdapterImpl, error) {
@@ -20,13 +22,13 @@ func NewScrapperAdapterImpl(baseURL string) (*ScrapperAdapterImpl, error) {
 		return nil, fmt.Errorf("scrapper service create: %w", err)
 	}
 
-	return &ScrapperAdapterImpl{client: c}, nil
+	return &ScrapperAdapterImpl{Client: c}, nil
 }
 
 func (s *ScrapperAdapterImpl) AddChat(chatID int64) error {
 	ctx := context.Background()
 
-	resp, err := s.client.PostTgChatIdWithResponse(ctx, chatID)
+	resp, err := s.Client.PostTgChatIdWithResponse(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("response: %w", err)
 	}
@@ -43,7 +45,7 @@ func (s *ScrapperAdapterImpl) AddChat(chatID int64) error {
 func (s *ScrapperAdapterImpl) DeleteChat(chatID int64) error {
 	ctx := context.Background()
 
-	resp, err := s.client.DeleteTgChatIdWithResponse(ctx, chatID)
+	resp, err := s.Client.DeleteTgChatIdWithResponse(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("response: %w", err)
 	}
@@ -61,19 +63,14 @@ func (s *ScrapperAdapterImpl) GetLinks(chatID int64) ([]domain.LinkWithID, error
 	ctx := context.Background()
 	params := rest.GetLinksParams{TgChatId: chatID}
 
-	resp, err := s.client.GetLinksWithResponse(ctx, &params)
+	resp, err := s.Client.GetLinksWithResponse(ctx, &params)
 	if err != nil {
 		return nil, fmt.Errorf("response: %w", err)
 	}
 
 	switch resp.StatusCode() {
 	case http.StatusOK:
-		links := make([]domain.LinkWithID, len(*resp.JSON200.Links))
-		for idx, link := range *resp.JSON200.Links {
-			links[idx] = *domain.LinkResponseToLinkWithID(&link)
-		}
-
-		return links, nil
+		return domain.LinkResponseSliceToLinkWithIDSlice(*resp.JSON200.Links), nil
 
 	default:
 		return nil, uerrors.ErrInternal
@@ -88,12 +85,12 @@ func (s *ScrapperAdapterImpl) AddLink(chatID int64, link domain.Link) error {
 		Link:    &link.URL,
 		Tags:    &link.Tags,
 	}
-
-	resp, err := s.client.PostLinksWithResponse(ctx, &params, body)
+	fmt.Fprintf(os.Stderr, "request body: %v\n", body)
+	resp, err := s.Client.PostLinksWithResponse(ctx, &params, body)
 	if err != nil {
 		return fmt.Errorf("response: %w", err)
 	}
-
+	fmt.Fprintf(os.Stderr, "get response status code: %d\n", resp.StatusCode())
 	switch resp.StatusCode() {
 	case http.StatusOK:
 		return nil
@@ -104,11 +101,41 @@ func (s *ScrapperAdapterImpl) AddLink(chatID int64, link domain.Link) error {
 		return uerrors.ErrLinkNotFound
 
 	case http.StatusBadRequest:
-		if resp.JSON400.Code != nil && *resp.JSON400.Code == "bad_url" {
-			return uerrors.ErrBadURL
+		if resp.JSON400 == nil {
+			var errResp rest.ApiErrorResponse
+			err = json.Unmarshal(resp.Body, &errResp)
+			if err != nil {
+				return fmt.Errorf("unmarshal error response: %w", err)
+			}
+
+			if errResp.Code == nil {
+				return fmt.Errorf("unexpected error response without code")
+			}
+
+			switch *errResp.Code {
+			case "bad_url":
+				return uerrors.ErrBadURL
+
+			case "api_not_allowed":
+				return uerrors.ErrAPINotAlowed
+			}
 		}
 
-	default:
+	case http.StatusInternalServerError:
+		var errResp rest.ApiErrorResponse
+		err = json.Unmarshal(resp.Body, &errResp)
+		if err != nil {
+			return fmt.Errorf("unmarshal error response: %w", err)
+		}
+
+		if errResp.Code == nil {
+			return fmt.Errorf("unexpected error response without code")
+		}
+
+		switch *errResp.Code {
+		case "api_unavailable":
+			return uerrors.ErrAPIUnavailable
+		}
 	}
 
 	return uerrors.ErrInternal
@@ -121,7 +148,7 @@ func (s *ScrapperAdapterImpl) DeleteLink(chatID int64, url string) error {
 		Link: &url,
 	}
 
-	resp, err := s.client.DeleteLinksWithResponse(ctx, &params, body)
+	resp, err := s.Client.DeleteLinksWithResponse(ctx, &params, body)
 	if err != nil {
 		return fmt.Errorf("response: %w", err)
 	}

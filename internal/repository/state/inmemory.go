@@ -4,22 +4,22 @@ import (
 	"sync"
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/uerrors"
+	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 )
 
 type InMemoryStateRepo struct {
 	*sync.RWMutex
-	data map[int64]domain.BotData
+	data map[int64]domain.ChatData
 }
 
 func NewInMemoryStateRepo() *InMemoryStateRepo {
 	return &InMemoryStateRepo{
 		RWMutex: &sync.RWMutex{},
-		data:    make(map[int64]domain.BotData),
+		data:    make(map[int64]domain.ChatData),
 	}
 }
 
-func (r *InMemoryStateRepo) GetData(chatID int64) (domain.BotData, error) {
+func (r *InMemoryStateRepo) GetData(chatID int64) (domain.ChatData, error) {
 	r.RLock()
 	defer r.RUnlock()
 
@@ -32,7 +32,7 @@ func (r *InMemoryStateRepo) GetData(chatID int64) (domain.BotData, error) {
 	return data, nil
 }
 
-func (r *InMemoryStateRepo) SetData(chatID int64, data domain.BotData) error {
+func (r *InMemoryStateRepo) SetData(chatID int64, data domain.ChatData) error {
 	r.Lock()
 	defer r.Unlock()
 

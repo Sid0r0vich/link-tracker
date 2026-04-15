@@ -6,6 +6,8 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 )
 
+//go:generate go run go.uber.org/mock/mockgen -source=repo.go -destination=mocks/mock.gen.go -package=mocks
+
 type LinkRepository interface {
 	AddChat(int64) error
 	DeleteChat(int64) error
@@ -15,6 +17,11 @@ type LinkRepository interface {
 }
 
 type LinkUpdateRepository interface {
-	GetTimeAndUpdateLink(string, time.Time) (bool, error)
-	GetAllLinks() (map[string]domain.LinkUpdate, error)
+	GetTimeAndUpdateLink(string, time.Time) (time.Time, error)
+	GetAllLinks() ([]domain.LinkUpdate, error)
+}
+
+type LinkUnitedRepository interface {
+	LinkRepository
+	LinkUpdateRepository
 }
