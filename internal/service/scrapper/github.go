@@ -106,12 +106,20 @@ func (s *GithubScrapper) GetUpdate(url string) (*domain.Update, error) {
 		return nil, fmt.Errorf("json decoder: %w", err)
 	}
 
+<<<<<<< HEAD
 	pulls, err := s.getEvents(repo, "pulls")
+=======
+	pulls, err := s.getEvents(url+"/pulls", "pull request")
+>>>>>>> b203e41 (feat: fix hw-4)
 	if err != nil {
 		return nil, fmt.Errorf("get pulls: %w", err)
 	}
 
+<<<<<<< HEAD
 	issues, err := s.getEvents(repo, "issues")
+=======
+	issues, err := s.getEvents(url+"/issues", "issue")
+>>>>>>> b203e41 (feat: fix hw-4)
 	if err != nil {
 		return nil, fmt.Errorf("get issues: %w", err)
 	}
