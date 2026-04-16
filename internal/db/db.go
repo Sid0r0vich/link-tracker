@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"sync"
 	"time"
@@ -17,12 +16,8 @@ import (
 var once sync.Once
 var pgPool *pgxpool.Pool
 
-//go:embed migrations/*.sql
-var embedMigrations embed.FS
-
+// Оставил эту функцию для тестов
 func Migrate(cfg *pgx.ConnConfig) error {
-	goose.SetBaseFS(embedMigrations)
-
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("goose set dialect: %w", err)
 	}
@@ -30,7 +25,7 @@ func Migrate(cfg *pgx.ConnConfig) error {
 	db := stdlib.OpenDB(*cfg)
 	defer func() { _ = db.Close() }()
 
-	if err := goose.Up(db, "migrations"); err != nil {
+	if err := goose.Up(db, "../../db/migrations"); err != nil {
 		return fmt.Errorf("goose up: %w", err)
 	}
 

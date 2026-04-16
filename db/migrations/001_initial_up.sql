@@ -22,13 +22,3 @@ CREATE TABLE subscription_tag (
     PRIMARY KEY (subscription_id, tag)
 );
 -- +goose StatementEnd
-
--- +goose Down
--- +goose StatementBegin
-DROP TABLE subscription_update;
-DROP TABLE subscription_tag;
-DROP TABLE chat_subscription;
-DROP TABLE link_tag;
-DROP TABLE subscription;
-DROP TABLE chat;
--- +goose StatementEnd

@@ -12,10 +12,11 @@ services:
     ports:
       - "1234:1234"
     networks:
-      - markdown-network
+      - markdown
     restart: unless-stopped
     depends_on:
       - db
+      - migrations
 
   bot:
     image: sid00r/link-tracker-bot:latest
@@ -30,7 +31,7 @@ services:
     ports:
       - "1235:1235"
     networks:
-      - markdown-network
+      - markdown
     restart: unless-stopped
 
   db:
@@ -43,13 +44,30 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - markdown-network
+      - markdown
     volumes:
       - pgdata:/var/lib/postgresql/data
     command: ["postgres", "-c", "log_statement=all"]
 
+  migrations:
+    image: liquibase/liquibase:4.29
+    depends_on:
+      - db
+    command:
+      - --searchPath=/changesets
+      - --changelog-file=master.xml
+      - --driver=org.postgresql.Driver
+      - --url=jdbc:postgresql://db:5432/$APP_POSTGRES_DB
+      - --username=$APP_POSTGRES_USER
+      - --password=$APP_POSTGRES_PASSWORD
+      - update
+    volumes:
+      - ./db/migrations:/changesets
+    networks:
+      - markdown
+
 networks:
-  markdown-network:
+  markdown:
     driver: bridge
 
 volumes:

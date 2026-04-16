@@ -41,11 +41,6 @@ func run(
 	restAPI *rest_handlers.ScrapperRestServer,
 	rpcAPI *rpc_handlers.ScrapperRPCServer,
 ) error {
-	logger.Info("start migration")
-	if err := db.Migrate(connCfg.ConnConfig); err != nil {
-		return fmt.Errorf("migrate: %w", err)
-	}
-
 	sched.Start()
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
