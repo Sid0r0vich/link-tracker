@@ -19,3 +19,10 @@ scrapper:
   db_access_type: SQL
   transport_protocol: HTTP
   job_delay_interval_seconds: 30
+  #update_communication_type: kafka
+
+kafka:
+  brokers:
+    - broker:29092
+  topic: updates
+  group_id: 1
