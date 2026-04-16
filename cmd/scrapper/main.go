@@ -105,7 +105,7 @@ func main() {
 							},
 						})
 
-						return sql_link_repo.NewSqlLinkService(pool), nil
+						return sql_link_repo.NewSqlLinkService(pool, cfg.Database.SubscriptionBatchSize), nil
 
 					case "ORM":
 						db, err := sql.Open("pgx", db.GetDSNFromConfig(cfg))
@@ -121,7 +121,7 @@ func main() {
 							},
 						})
 
-						return orm_link_repo.NewORMLinkService(db), nil
+						return orm_link_repo.NewORMLinkService(db, cfg.Database.SubscriptionBatchSize), nil
 
 					default:
 						return nil, fmt.Errorf("invalid db access type: %s", cfg.Scrapper.DBAccessType)

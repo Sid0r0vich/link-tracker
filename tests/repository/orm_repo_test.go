@@ -63,7 +63,7 @@ func (s *OrmRepoTestSuite) SetupSuite() {
 		panic(fmt.Errorf("failed to execute migrations: %v", err))
 	}
 
-	s.ormRepo = orm_link_repo.NewORMLinkService(s.db)
+	s.ormRepo = orm_link_repo.NewORMLinkService(s.db, SubscriptionBatchSize)
 }
 
 func (s *OrmRepoTestSuite) TearDownSuite() {
@@ -119,10 +119,10 @@ func (s *OrmRepoTestSuite) TestOrmLinkRepo_GetTimeAndUpdateLinkNotFound() {
 	LinkRepo_GetTimeAndUpdateLinkNotFoundTest(s.T(), s.ormRepo)
 }
 
-func (s *OrmRepoTestSuite) TestOrmLinkRepo_GetAllLinks() {
+func (s *OrmRepoTestSuite) TestOrmLinkRepo_GetLinkBatch() {
 	if err := s.cleanupTestDB(); err != nil {
 		s.T().Fatal(err.Error())
 	}
 
-	LinkRepo_GetAllLinksTest(s.T(), s.ormRepo)
+	LinkRepo_GetLinkBatchTest(s.T(), s.ormRepo)
 }

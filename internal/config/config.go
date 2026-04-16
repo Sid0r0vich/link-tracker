@@ -47,15 +47,16 @@ type Config struct {
 }
 
 type DatabaseConfig struct {
-	Host                string `mapstructure:"host"`
-	Port                int    `mapstructure:"port"`
-	Username            string `mapstructure:"username"`
-	Password            string `mapstructure:"password"`
-	Name                string `mapstructure:"name"`
-	MaxConns            int    `mapstructure:"max_conns"`
-	MinConns            int    `mapstructure:"min_conns"`
-	MaxConnIdleTimeMins int    `mapstructure:"max_conn_idle_time_mins"`
-	MaxConnLifeTimeMins int    `mapstructure:"max_conn_life_time_mins"`
+	Host                  string `mapstructure:"host"`
+	Port                  int    `mapstructure:"port"`
+	Username              string `mapstructure:"username"`
+	Password              string `mapstructure:"password"`
+	Name                  string `mapstructure:"name"`
+	MaxConns              int    `mapstructure:"max_conns"`
+	MinConns              int    `mapstructure:"min_conns"`
+	MaxConnIdleTimeMins   int    `mapstructure:"max_conn_idle_time_mins"`
+	MaxConnLifeTimeMins   int    `mapstructure:"max_conn_life_time_mins"`
+	SubscriptionBatchSize uint   `mapstructure:"subscription_batch_size"`
 }
 
 type BotConfig struct {

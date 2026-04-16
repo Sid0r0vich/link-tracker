@@ -27,6 +27,14 @@ func LinkResponseToLinkWithID(link *rest.LinkResponse) *LinkWithID {
 	}
 }
 
+func LinkResponseSliceToLinkWithID(links []rest.LinkResponse) []LinkWithID {
+	result := make([]LinkWithID, len(links))
+	for i, link := range links {
+		result[i] = *LinkResponseToLinkWithID(&link)
+	}
+	return result
+}
+
 func LinkResponseSliceToLinkWithIDSlice(links []rest.LinkResponse) []LinkWithID {
 	newLinks := make([]LinkWithID, len(links))
 	for idx, link := range links {
@@ -34,14 +42,6 @@ func LinkResponseSliceToLinkWithIDSlice(links []rest.LinkResponse) []LinkWithID 
 	}
 
 	return newLinks
-}
-
-func LinkResponseSliceToLinkWithID(links []rest.LinkResponse) []LinkWithID {
-	result := make([]LinkWithID, len(links))
-	for i, link := range links {
-		result[i] = *LinkResponseToLinkWithID(&link)
-	}
-	return result
 }
 
 func LinkInfoWithIDToLinkWithID(link *LinkInfoWithID, url string) *LinkWithID {

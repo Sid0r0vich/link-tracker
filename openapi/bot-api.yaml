@@ -55,7 +55,32 @@ components:
           items:
             type: integer
             format: int64
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
       required:
         - id
         - url
         - tgChatIds
+        - data
+    Event:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        username:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - type
+        - title
+        - description
+        - username
+        - createdAt

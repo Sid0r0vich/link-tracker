@@ -138,19 +138,20 @@ func (m *MockLinkUpdateRepository) EXPECT() *MockLinkUpdateRepositoryMockRecorde
 	return m.recorder
 }
 
-// GetAllLinks mocks base method.
-func (m *MockLinkUpdateRepository) GetAllLinks() ([]domain.LinkUpdate, error) {
+// GetLinkBatch mocks base method.
+func (m *MockLinkUpdateRepository) GetLinkBatch(arg0 int64) ([]domain.LinkUpdate, int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAllLinks")
+	ret := m.ctrl.Call(m, "GetLinkBatch", arg0)
 	ret0, _ := ret[0].([]domain.LinkUpdate)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
-// GetAllLinks indicates an expected call of GetAllLinks.
-func (mr *MockLinkUpdateRepositoryMockRecorder) GetAllLinks() *gomock.Call {
+// GetLinkBatch indicates an expected call of GetLinkBatch.
+func (mr *MockLinkUpdateRepositoryMockRecorder) GetLinkBatch(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllLinks", reflect.TypeOf((*MockLinkUpdateRepository)(nil).GetAllLinks))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLinkBatch", reflect.TypeOf((*MockLinkUpdateRepository)(nil).GetLinkBatch), arg0)
 }
 
 // GetTimeAndUpdateLink mocks base method.
@@ -250,19 +251,20 @@ func (mr *MockLinkUnitedRepositoryMockRecorder) DeleteLink(arg0, arg1 any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLink", reflect.TypeOf((*MockLinkUnitedRepository)(nil).DeleteLink), arg0, arg1)
 }
 
-// GetAllLinks mocks base method.
-func (m *MockLinkUnitedRepository) GetAllLinks() ([]domain.LinkUpdate, error) {
+// GetLinkBatch mocks base method.
+func (m *MockLinkUnitedRepository) GetLinkBatch(arg0 int64) ([]domain.LinkUpdate, int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAllLinks")
+	ret := m.ctrl.Call(m, "GetLinkBatch", arg0)
 	ret0, _ := ret[0].([]domain.LinkUpdate)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
-// GetAllLinks indicates an expected call of GetAllLinks.
-func (mr *MockLinkUnitedRepositoryMockRecorder) GetAllLinks() *gomock.Call {
+// GetLinkBatch indicates an expected call of GetLinkBatch.
+func (mr *MockLinkUnitedRepositoryMockRecorder) GetLinkBatch(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllLinks", reflect.TypeOf((*MockLinkUnitedRepository)(nil).GetAllLinks))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLinkBatch", reflect.TypeOf((*MockLinkUnitedRepository)(nil).GetLinkBatch), arg0)
 }
 
 // GetLinks mocks base method.

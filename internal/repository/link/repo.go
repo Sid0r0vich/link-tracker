@@ -18,7 +18,7 @@ type LinkRepository interface {
 
 type LinkUpdateRepository interface {
 	GetTimeAndUpdateLink(string, time.Time) (time.Time, error)
-	GetAllLinks() ([]domain.LinkUpdate, error)
+	GetLinkBatch(int64) ([]domain.LinkUpdate, int64, error)
 }
 
 type LinkUnitedRepository interface {

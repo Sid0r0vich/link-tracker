@@ -13,12 +13,17 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/utils"
+	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
 
 type GithubScrapper struct {
-	Token  string
-	Client http.Client
-	Logger *slog.Logger
+	Token     string
+	Client    http.Client
+	Logger    *slog.Logger
+	apiHost   string
+	apiScheme string
+	urlHost   string
+	urlScheme string
 }
 
 type githubRepository struct {
@@ -28,9 +33,11 @@ type githubRepository struct {
 
 func NewGithubScrapper(token string, logger *slog.Logger) *GithubScrapper {
 	return &GithubScrapper{
-		Token:  token,
-		Logger: logger,
-		Client: http.Client{Timeout: 5 * time.Second},
+		Token:     token,
+		Logger:    logger,
+		Client:    http.Client{Timeout: 5 * time.Second},
+		apiHost:   "api.github.com",
+		apiScheme: "https",
 	}
 }
 
@@ -83,7 +90,7 @@ func (s *GithubScrapper) GetUpdate(url string) (*domain.Update, error) {
 		return nil, fmt.Errorf("get repository: %v, %w", err, uerrors.ErrBadURL)
 	}
 
-	repoUrl := fmt.Sprintf("https://api.github.com/repos/%s/%s", repo.author, repo.name)
+	repoUrl := fmt.Sprintf("%s://%s/repos/%s/%s", s.apiScheme, s.apiHost, repo.author, repo.name)
 	resp, err := s.makeRequest(repoUrl)
 	if err != nil {
 		return nil, err
@@ -91,8 +98,7 @@ func (s *GithubScrapper) GetUpdate(url string) (*domain.Update, error) {
 	defer resp.Body.Close()
 
 	var upd struct {
-		UpdatedAt time.Time `json:"updated_at"`
-		Desc      string    `json:"description"`
+		Desc string `json:"description"`
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&upd)
@@ -100,9 +106,30 @@ func (s *GithubScrapper) GetUpdate(url string) (*domain.Update, error) {
 		return nil, fmt.Errorf("json decoder: %w", err)
 	}
 
+	pulls, err := s.getEvents(repo, "pulls")
+	if err != nil {
+		return nil, fmt.Errorf("get pulls: %w", err)
+	}
+
+	issues, err := s.getEvents(repo, "issues")
+	if err != nil {
+		return nil, fmt.Errorf("get issues: %w", err)
+	}
+
+	allEvents := append(pulls, issues...)
+
+	updatedAt := time.Time{}
+	for _, pl := range allEvents {
+		s.Logger.Info("event request update time", "url", url, "created_at", pl.CreatedAt)
+		if pl.CreatedAt.After(updatedAt) {
+			updatedAt = pl.CreatedAt
+		}
+	}
+
 	update := domain.Update{
 		URL:       url,
-		UpdatedAt: upd.UpdatedAt,
+		UpdatedAt: updatedAt,
+		Data:      allEvents,
 	}
 
 	return &update, nil
@@ -130,4 +157,54 @@ func (s *GithubScrapper) getRepository(lurl string) (*githubRepository, error) {
 		author: parts[0],
 		name:   parts[1],
 	}, nil
+}
+
+func (s *GithubScrapper) getEvents(repo *githubRepository, typ string) ([]api.Event, error) {
+	type user struct {
+		Login string `json:"login"`
+	}
+	type pull struct {
+		CreatedAt   time.Time `json:"created_at"`
+		Title       string    `json:"title"`
+		User        user      `json:"user"`
+		Description string    `json:"body"`
+	}
+
+	var url string
+	var humanType string
+	switch typ {
+	case "pulls":
+		url = fmt.Sprintf("%s://%s/repos/%s/%s/pulls", s.apiScheme, s.apiHost, repo.author, repo.name)
+		humanType = "pull request"
+	case "issues":
+		url = fmt.Sprintf("%s://%s/repos/%s/%s/issues", s.apiScheme, s.apiHost, repo.author, repo.name)
+		humanType = "issue"
+	default:
+		return nil, fmt.Errorf("invalid event type: %s", typ)
+	}
+
+	resp, err := s.makeRequest(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var pulls []pull
+	err = json.NewDecoder(resp.Body).Decode(&pulls)
+	if err != nil {
+		return nil, fmt.Errorf("json decoder: %w", err)
+	}
+
+	result := make([]api.Event, 0)
+	for _, pl := range pulls {
+		result = append(result, api.Event{
+			Type:        humanType,
+			CreatedAt:   pl.CreatedAt,
+			Title:       pl.Title,
+			Username:    pl.User.Login,
+			Description: utils.CutDescription(pl.Description, maxDescriptionLength),
+		})
+	}
+
+	return result, nil
 }

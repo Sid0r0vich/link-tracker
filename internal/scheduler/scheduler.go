@@ -66,15 +66,25 @@ func (s *Scheduler) checkLinkUpdates(lurl string, linkUpd domain.LinkUpdate) err
 		s.logger.Error(fmt.Sprintf("get time and update link: %v", err))
 		return fmt.Errorf("get link update time: %w", err)
 	}
+	s.logger.Info("get link update time", "url", lurl, "old_updated_at", oldUpdatedAt, "new_updated_at", update.UpdatedAt)
 
 	if !oldUpdatedAt.Before(update.UpdatedAt) {
 		return nil
+	}
+
+	s.logger.Info("get updates", "url", lurl, "pulls", update.Data)
+	data := make([]api.Event, 0)
+	for _, event := range update.Data {
+		if event.CreatedAt.After(oldUpdatedAt) && !event.CreatedAt.After(update.UpdatedAt) {
+			data = append(data, event)
+		}
 	}
 
 	res := api.UpdateResponse{
 		Id:        update.ID,
 		Url:       update.URL,
 		TgChatIds: linkUpd.IDs,
+		Data:      data,
 	}
 	if err := s.updater.SendUpdate(&res); err != nil {
 		return fmt.Errorf("send update to bot: %w", err)
@@ -83,19 +93,26 @@ func (s *Scheduler) checkLinkUpdates(lurl string, linkUpd domain.LinkUpdate) err
 }
 
 func (s *Scheduler) CheckUpdates() error {
-	links, err := s.linkRepo.GetAllLinks()
-	if err != nil {
-		s.LogError(fmt.Errorf("get links: %w", err))
-	}
+	lastID := int64(0)
 
-	if len(links) == 0 {
-		return nil
-	}
-
-	for _, linkUpd := range links {
-		err = s.checkLinkUpdates(linkUpd.URL, linkUpd)
+	for {
+		links, newLastID, err := s.linkRepo.GetLinkBatch(lastID)
 		if err != nil {
-			s.LogError(fmt.Errorf("check link updates: %w", err))
+			s.LogError(fmt.Errorf("get link batch: %w", err))
+		}
+		s.logger.Info("get link batch", "links", links)
+
+		if len(links) == 0 {
+			break
+		}
+
+		lastID = newLastID
+
+		for _, linkUpd := range links {
+			err = s.checkLinkUpdates(linkUpd.URL, linkUpd)
+			if err != nil {
+				s.LogError(fmt.Errorf("check link updates: %w", err))
+			}
 		}
 	}
 

@@ -171,7 +171,7 @@ func LinkRepo_GetTimeAndUpdateLinkNotFoundTest(t *testing.T, repo link_repositor
 	}
 }
 
-func LinkRepo_GetAllLinksTest(t *testing.T, repo link_repository.LinkUnitedRepository) {
+func LinkRepo_GetLinkBatchTest(t *testing.T, repo link_repository.LinkUnitedRepository) {
 	firChat := int64(3)
 	secChat := int64(4)
 	linkA := "https://example.com/aa"
@@ -195,15 +195,40 @@ func LinkRepo_GetAllLinksTest(t *testing.T, repo link_repository.LinkUnitedRepos
 	_, err = repo.AddLink(firChat, domain.Link{URL: linkC, LinkInfo: domain.LinkInfo{UpdatedAt: t0.Add(2 * time.Hour)}})
 	assert.NoError(t, err)
 
-	links, err := repo.GetAllLinks()
+	batch, lastID, err := repo.GetLinkBatch(0)
 	assert.NoError(t, err)
-
-	var found bool
-	for _, link := range links {
-		if len(link.IDs) == 2 && link.IDs[0] == 3 && link.IDs[1] == 4 && link.URL == linkA {
-			found = true
-			break
-		}
+	if len(batch) != 2 {
+		t.Fatalf("expected first batch size 2, got %d", len(batch))
 	}
-	assert.True(t, found)
+	if lastID <= 0 {
+		t.Fatalf("expected last id > 0, got %d", lastID)
+	}
+
+	urlToIDs := make(map[string][]int64, len(batch))
+	for _, upd := range batch {
+		sort.Slice(upd.IDs, func(i, j int) bool { return upd.IDs[i] < upd.IDs[j] })
+		urlToIDs[upd.URL] = upd.IDs
+	}
+
+	idsForA, ok := urlToIDs[linkA]
+	if !ok {
+		t.Fatalf("expected url aa in first batch, got %#v", batch)
+	}
+	assert.Equal(t, []int64{firChat, secChat}, idsForA)
+
+	if _, ok := urlToIDs[linkB]; !ok {
+		t.Fatalf("expected url bb in first batch, got %#v", batch)
+	}
+
+	nextBatch, nextLastID, err := repo.GetLinkBatch(lastID)
+	assert.NoError(t, err)
+	if len(nextBatch) != 1 {
+		t.Fatalf("expected second batch size 1, got %d", len(nextBatch))
+	}
+	if nextBatch[0].URL != linkC {
+		t.Fatalf("expected url cc in second batch, got %s", nextBatch[0].URL)
+	}
+	if nextLastID <= lastID {
+		t.Fatalf("expected next last id > first last id, got %d <= %d", nextLastID, lastID)
+	}
 }

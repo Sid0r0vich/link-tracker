@@ -15,12 +15,14 @@ import (
 )
 
 type OrmLinkService struct {
-	db *goqu.Database
+	db                    *goqu.Database
+	subscriptionBatchSize uint
 }
 
-func NewORMLinkService(db *sql.DB) *OrmLinkService {
+func NewORMLinkService(db *sql.DB, subscriptionBatchSize uint) *OrmLinkService {
 	return &OrmLinkService{
-		db: goqu.New("postgres", db),
+		db:                    goqu.New("postgres", db),
+		subscriptionBatchSize: subscriptionBatchSize,
 	}
 }
 
@@ -329,7 +331,7 @@ func (s *OrmLinkService) GetTimeAndUpdateLink(url string, updatedAt time.Time) (
 	return currentUpdatedAt, nil
 }
 
-func (s *OrmLinkService) GetAllLinks() ([]domain.LinkUpdate, error) {
+func (s *OrmLinkService) GetLinkBatch(lastID int64) ([]domain.LinkUpdate, int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -345,29 +347,31 @@ func (s *OrmLinkService) GetAllLinks() ([]domain.LinkUpdate, error) {
 			goqu.T("chat_subscription"),
 			goqu.On(goqu.I("subscription.id").Eq(goqu.I("chat_subscription.subscription_id"))),
 		).
+		Where(goqu.I("subscription.id").Gt(lastID)).
 		GroupBy(
 			goqu.I("subscription.id"),
 			goqu.I("subscription.url"),
 			goqu.I("subscription.updated_at"),
 		).
-		Order(goqu.I("subscription.id").Asc())
+		Order(goqu.I("subscription.id").Asc()).
+		Limit(s.subscriptionBatchSize)
 
 	rows, err := ds.Executor().QueryContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("query get all links: %w", err)
+		return nil, 0, fmt.Errorf("query get all links: %w", err)
 	}
 	defer rows.Close()
 
 	result := make([]domain.LinkUpdate, 0)
 
+	var newLastID int64
 	for rows.Next() {
-		var id int64
 		var url string
 		var updatedAt time.Time
 		var subscriberIDs pq.Int64Array
 
-		if err := rows.Scan(&id, &url, &updatedAt, &subscriberIDs); err != nil {
-			return nil, fmt.Errorf("scan row: %w", err)
+		if err := rows.Scan(&newLastID, &url, &updatedAt, &subscriberIDs); err != nil {
+			return nil, 0, fmt.Errorf("scan row: %w", err)
 		}
 
 		result = append(result, domain.LinkUpdate{
@@ -377,5 +381,5 @@ func (s *OrmLinkService) GetAllLinks() ([]domain.LinkUpdate, error) {
 		})
 	}
 
-	return result, nil
+	return result, newLastID, nil
 }

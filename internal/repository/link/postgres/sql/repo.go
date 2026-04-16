@@ -15,11 +15,12 @@ import (
 )
 
 type SqlLinkService struct {
-	pool *pgxpool.Pool
+	pool                  *pgxpool.Pool
+	subscriptionBatchSize uint
 }
 
-func NewSqlLinkService(pool *pgxpool.Pool) *SqlLinkService {
-	return &SqlLinkService{pool: pool}
+func NewSqlLinkService(pool *pgxpool.Pool, subscriptionBatchSize uint) *SqlLinkService {
+	return &SqlLinkService{pool: pool, subscriptionBatchSize: subscriptionBatchSize}
 }
 
 func (s *SqlLinkService) AddChat(chatID int64) error {
@@ -277,7 +278,7 @@ func (s *SqlLinkService) GetTimeAndUpdateLink(url string, updatedAt time.Time) (
 	return currentUpdatedAt, nil
 }
 
-func (s *SqlLinkService) GetAllLinks() ([]domain.LinkUpdate, error) {
+func (s *SqlLinkService) GetLinkBatch(lastID int64) ([]domain.LinkUpdate, int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -289,25 +290,27 @@ func (s *SqlLinkService) GetAllLinks() ([]domain.LinkUpdate, error) {
 			ARRAY_AGG(chat_subscription.chat_id) AS subscriber_ids
         FROM subscription
 		INNER JOIN chat_subscription ON subscription.id = chat_subscription.subscription_id
+		WHERE subscription.id > $1
         GROUP BY subscription.id, subscription.url, subscription.updated_at
 		ORDER BY subscription.id
+		LIMIT $2
     `
 
-	rows, err := s.pool.Query(ctx, query)
+	rows, err := s.pool.Query(ctx, query, lastID, s.subscriptionBatchSize)
 	if err != nil {
-		return nil, fmt.Errorf("query get all links: %w", err)
+		return nil, 0, fmt.Errorf("query get all links: %w", err)
 	}
 	defer rows.Close()
 
 	result := make([]domain.LinkUpdate, 0, rows.CommandTag().RowsAffected())
+	var newLastID int64
 	for rows.Next() {
-		var id int64
 		var url string
 		var updatedAt time.Time
 		var subscriberIDs []int64
 
-		if err := rows.Scan(&id, &url, &updatedAt, &subscriberIDs); err != nil {
-			return nil, fmt.Errorf("scan row: %w", err)
+		if err := rows.Scan(&newLastID, &url, &updatedAt, &subscriberIDs); err != nil {
+			return nil, 0, fmt.Errorf("scan row: %w", err)
 		}
 
 		result = append(result, domain.LinkUpdate{
@@ -318,8 +321,8 @@ func (s *SqlLinkService) GetAllLinks() ([]domain.LinkUpdate, error) {
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate rows: %w", err)
+		return nil, 0, fmt.Errorf("iterate rows: %w", err)
 	}
 
-	return result, nil
+	return result, newLastID, nil
 }

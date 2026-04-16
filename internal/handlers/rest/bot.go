@@ -31,6 +31,17 @@ func (s *BotRestServer) GetUpdate(w http.ResponseWriter, r *http.Request) {
 
 	for _, chatID := range req.TgChatIds {
 		msg := fmt.Sprintf("Получено обновление!\nСсылка: %s\n", req.Url)
-		s.bot.Send(chatID, msg)
+
+		for _, event := range req.Data {
+			data := fmt.Sprintf(
+				"Тип: %s\nНазвание: %s\nОписание: %s\nПользователь: %s\nСоздано: %s\n",
+				event.Type,
+				event.Title,
+				event.Description,
+				event.Username,
+				event.CreatedAt,
+			)
+			s.bot.Send(chatID, msg+data)
+		}
 	}
 }

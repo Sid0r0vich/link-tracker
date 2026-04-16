@@ -8,6 +8,7 @@ database:
   min_conns: 2
   max_conn_idle_time_mins: 5
   max_conn_life_time_mins: 30
+  subscription_batch_size: 100
 
 bot:
   token: bot-token

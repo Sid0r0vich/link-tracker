@@ -63,7 +63,7 @@ func (s *SqlRepoTestSuite) SetupSuite() {
 		panic(fmt.Errorf("failed to execute migrations: %v", err))
 	}
 
-	s.sqlRepo = sql_link_repo.NewSqlLinkService(s.pool)
+	s.sqlRepo = sql_link_repo.NewSqlLinkService(s.pool, SubscriptionBatchSize)
 }
 
 func (s *SqlRepoTestSuite) TearDownSuite() {
@@ -119,10 +119,10 @@ func (s *SqlRepoTestSuite) TestSqlLinkRepo_GetTimeAndUpdateLinkNotFound() {
 	LinkRepo_GetTimeAndUpdateLinkNotFoundTest(s.T(), s.sqlRepo)
 }
 
-func (s *SqlRepoTestSuite) TestSqlLinkRepo_GetAllLinks() {
+func (s *SqlRepoTestSuite) TestSqlLinkRepo_GetLinkBatch() {
 	if err := s.cleanupTestDB(); err != nil {
 		s.T().Fatal(err.Error())
 	}
 
-	LinkRepo_GetAllLinksTest(s.T(), s.sqlRepo)
+	LinkRepo_GetLinkBatchTest(s.T(), s.sqlRepo)
 }

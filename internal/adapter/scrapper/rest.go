@@ -69,7 +69,9 @@ func (s *ScrapperAdapterImpl) GetLinks(chatID int64) ([]domain.LinkWithID, error
 
 	switch resp.StatusCode() {
 	case http.StatusOK:
-		return domain.LinkResponseSliceToLinkWithIDSlice(*resp.JSON200.Links), nil
+		links := domain.LinkResponseSliceToLinkWithID(*resp.JSON200.Links)
+
+		return links, nil
 
 	default:
 		return nil, uerrors.ErrInternal

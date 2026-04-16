@@ -12,17 +12,22 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/utils"
+	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
 
 type StackoverflowScrapper struct {
-	Key    string
-	Client http.Client
+	Key       string
+	Client    http.Client
+	apiHost   string
+	apiScheme string
 }
 
 func NewStackoverflowScrapper(key string) *StackoverflowScrapper {
 	return &StackoverflowScrapper{
-		Key:    key,
-		Client: http.Client{Timeout: 5 * time.Second},
+		Key:       key,
+		Client:    http.Client{Timeout: 5 * time.Second},
+		apiHost:   "api.stackexchange.com",
+		apiScheme: "https",
 	}
 }
 
@@ -74,18 +79,6 @@ func (s *StackoverflowScrapper) makeRequest(rurl string) (*http.Response, error)
 }
 
 func (s *StackoverflowScrapper) GetUpdate(rurl string) (*domain.Update, error) {
-	questionID, err := s.getQuestionId(rurl)
-	if err != nil {
-		return nil, fmt.Errorf("get question id: %v, %w", err, uerrors.ErrBadURL)
-	}
-
-	questionUrl := fmt.Sprintf("https://api.stackexchange.com/questions/%s", questionID)
-	resp, err := s.makeRequest(questionUrl)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
 	type item struct {
 		LastActivityDate int64  `json:"last_activity_date"`
 		Title            string `json:"title"`
@@ -93,6 +86,18 @@ func (s *StackoverflowScrapper) GetUpdate(rurl string) (*domain.Update, error) {
 	var upd struct {
 		Items []item `json:"items"`
 	}
+
+	questionID, err := s.getQuestionId(rurl)
+	if err != nil {
+		return nil, fmt.Errorf("get question id: %v, %w", err, uerrors.ErrBadURL)
+	}
+
+	questionUrl := fmt.Sprintf("%s://%s/questions/%s", s.apiScheme, s.apiHost, questionID)
+	resp, err := s.makeRequest(questionUrl)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
 	err = json.NewDecoder(resp.Body).Decode(&upd)
 	if err != nil {
@@ -104,9 +109,29 @@ func (s *StackoverflowScrapper) GetUpdate(rurl string) (*domain.Update, error) {
 	}
 	it := upd.Items[0]
 
+	answers, err := s.getEvents(questionID, "answer", it.Title)
+	if err != nil {
+		return nil, fmt.Errorf("get events: %w", err)
+	}
+
+	comments, err := s.getEvents(questionID, "comment", it.Title)
+	if err != nil {
+		return nil, fmt.Errorf("get events: %w", err)
+	}
+
+	allEvents := append(answers, comments...)
+
+	updatedAt := time.Time{}
+	for _, event := range allEvents {
+		if event.CreatedAt.After(updatedAt) {
+			updatedAt = event.CreatedAt
+		}
+	}
+
 	update := domain.Update{
 		URL:       rurl,
 		UpdatedAt: time.Unix(it.LastActivityDate, 0),
+		Data:      allEvents,
 	}
 
 	return &update, nil
@@ -131,4 +156,58 @@ func (s *StackoverflowScrapper) getQuestionId(lurl string) (string, error) {
 	}
 
 	return parts[1], nil
+}
+
+func (s *StackoverflowScrapper) getEvents(questionID string, typ string, title string) ([]api.Event, error) {
+	type Owner struct {
+		DisplayName string `json:"display_name"`
+	}
+
+	type Answer struct {
+		LastActivityDate int64  `json:"last_activity_date"`
+		CreationDate     int64  `json:"creation_date"`
+		Owner            Owner  `json:"owner"`
+		Content          string `json:"body"`
+	}
+
+	var apiResponse struct {
+		Items []Answer `json:"items"`
+	}
+
+	var url string
+	var humanType string
+	switch typ {
+	case "answer":
+		url = fmt.Sprintf("%s://%s/questions/%s/answers", s.apiScheme, s.apiHost, questionID)
+		humanType = "answer"
+	case "comment":
+		url = fmt.Sprintf("%s://%s/questions/%s/comments", s.apiScheme, s.apiHost, questionID)
+		humanType = "comment"
+	default:
+		return nil, fmt.Errorf("invalid event type: %s", typ)
+	}
+
+	resp, err := s.makeRequest(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	err = json.NewDecoder(resp.Body).Decode(&apiResponse)
+	if err != nil {
+		return nil, fmt.Errorf("json decoder: %w", err)
+	}
+
+	events := make([]api.Event, 0)
+	for _, answer := range apiResponse.Items {
+		events = append(events, api.Event{
+			Type:        humanType,
+			CreatedAt:   time.Unix(answer.CreationDate, 0),
+			Title:       title,
+			Username:    answer.Owner.DisplayName,
+			Description: utils.CutDescription(answer.Content, maxDescriptionLength),
+		})
+	}
+
+	return events, nil
 }

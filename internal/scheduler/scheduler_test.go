@@ -20,7 +20,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestScheduler_Smokes(t *testing.T) {
+func TestScheduler_CheckUpdates_PartialFailuresAreIsolated(t *testing.T) {
 	t.Parallel()
 
 	ctrl := gomock.NewController(t)
@@ -52,23 +52,33 @@ func TestScheduler_Smokes(t *testing.T) {
 	eventTime := time.Unix(0, 0).UTC()
 	okUrl := "https://example.com/ok"
 	failUrl := "https://example.com/fail"
+	batchSize := int64(2)
 	okChatIDs := []int64{2, 3}
 
-	repo.EXPECT().GetAllLinks().Return([]domain.LinkUpdate{
+	repo.EXPECT().GetLinkBatch(int64(0)).Return([]domain.LinkUpdate{
 		{URL: failUrl, IDs: []int64{1}},
 		{URL: okUrl, IDs: okChatIDs},
-	}, nil)
+	}, batchSize, nil)
 
 	scr.EXPECT().GetUpdate(failUrl).Return(nil, errors.New("upstream unavailable"))
 
+	event := api.Event{
+		Type:        "issue",
+		Title:       "title",
+		Username:    "name",
+		Description: "description",
+		CreatedAt:   eventTime,
+	}
 	upd := domain.Update{
 		ID:        7,
 		URL:       okUrl,
 		UpdatedAt: eventTime,
+		Data:      []api.Event{event},
 	}
 	scr.EXPECT().GetUpdate(okUrl).Return(&upd, nil)
 
 	repo.EXPECT().GetTimeAndUpdateLink(okUrl, eventTime).Return(time.Time{}, nil)
+	repo.EXPECT().GetLinkBatch(batchSize).Return([]domain.LinkUpdate{}, batchSize, nil)
 
 	s, err := scheduler.NewScheduler(repo, logger, updater, scr, time.Second)
 	if err != nil {
@@ -84,4 +94,6 @@ func TestScheduler_Smokes(t *testing.T) {
 
 	assert.Equal(t, okUrl, gotUpdResp.Url)
 	assert.Equal(t, okChatIDs, gotUpdResp.TgChatIds)
+	assert.Equal(t, 1, len(gotUpdResp.Data))
+	assert.Equal(t, event, gotUpdResp.Data[0])
 }
