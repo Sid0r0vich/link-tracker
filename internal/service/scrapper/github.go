@@ -6,6 +6,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
@@ -17,6 +19,11 @@ type GithubScrapper struct {
 	Token  string
 	Client http.Client
 	Logger *slog.Logger
+}
+
+type githubRepository struct {
+	author string
+	name   string
 }
 
 func NewGithubScrapper(token string, logger *slog.Logger) *GithubScrapper {
@@ -71,7 +78,13 @@ func (s *GithubScrapper) makeRequest(url string) (*http.Response, error) {
 }
 
 func (s *GithubScrapper) GetUpdate(url string) (*domain.Update, error) {
-	resp, err := s.makeRequest(url)
+	repo, err := s.getRepository(url)
+	if err != nil {
+		return nil, fmt.Errorf("get repository: %v, %w", err, uerrors.ErrBadURL)
+	}
+
+	repoUrl := fmt.Sprintf("https://api.github.com/repos/%s/%s", repo.author, repo.name)
+	resp, err := s.makeRequest(repoUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -93,4 +106,28 @@ func (s *GithubScrapper) GetUpdate(url string) (*domain.Update, error) {
 	}
 
 	return &update, nil
+}
+
+func (s *GithubScrapper) getRepository(lurl string) (*githubRepository, error) {
+	u, err := url.Parse(lurl)
+	if err != nil {
+		return nil, fmt.Errorf("parse url: %w", err)
+	}
+
+	if u.Scheme != "https" {
+		return nil, fmt.Errorf("invalid scheme: %s", u.Scheme)
+	}
+	if u.Host != "github.com" {
+		return nil, fmt.Errorf("invalid host: %s", u.Host)
+	}
+
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid path: %s", u.Path)
+	}
+
+	return &githubRepository{
+		author: parts[0],
+		name:   parts[1],
+	}, nil
 }

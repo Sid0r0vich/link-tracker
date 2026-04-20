@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
@@ -85,12 +84,12 @@ func (s *ScrapperAdapterImpl) AddLink(chatID int64, link domain.Link) error {
 		Link:    &link.URL,
 		Tags:    &link.Tags,
 	}
-	fmt.Fprintf(os.Stderr, "request body: %v\n", body)
+
 	resp, err := s.Client.PostLinksWithResponse(ctx, &params, body)
 	if err != nil {
 		return fmt.Errorf("response: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "get response status code: %d\n", resp.StatusCode())
+
 	switch resp.StatusCode() {
 	case http.StatusOK:
 		return nil

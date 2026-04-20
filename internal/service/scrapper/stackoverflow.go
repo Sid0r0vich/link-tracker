@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
@@ -25,9 +26,22 @@ func NewStackoverflowScrapper(key string) *StackoverflowScrapper {
 	}
 }
 
-func (s *StackoverflowScrapper) makeRequest(url string) (*http.Response, error) {
-	newURL := fmt.Sprintf("%s?key=%s&site=stackoverflow&filter=withbody", url, s.Key)
-	req, err := http.NewRequest("GET", newURL, nil)
+func (s *StackoverflowScrapper) makeRequest(rurl string) (*http.Response, error) {
+	parsedUrl, err := url.Parse(rurl)
+	if err != nil {
+		return nil, fmt.Errorf("parse url: %w", err)
+	}
+
+	params := url.Values{}
+	params.Add("site", "stackoverflow")
+	params.Add("filter", "withbody")
+	if s.Key != "" {
+		params.Add("key", s.Key)
+	}
+	parsedUrl.RawQuery = params.Encode()
+	newUrl := parsedUrl.String()
+
+	req, err := http.NewRequest("GET", newUrl, nil)
 	if err != nil {
 		return nil, uerrors.ErrBadURL
 	}
@@ -52,7 +66,7 @@ func (s *StackoverflowScrapper) makeRequest(url string) (*http.Response, error) 
 		case http.StatusForbidden:
 			return nil, uerrors.ErrInternal
 		default:
-			return nil, fmt.Errorf("Stack Overflow API error, url: %s, status: %d, code: %w", newURL, resp.StatusCode, uerrors.ErrBadURL)
+			return nil, fmt.Errorf("Stack Overflow API error, url: %s, status: %d, code: %w", newUrl, resp.StatusCode, uerrors.ErrBadURL)
 		}
 	}
 
@@ -60,12 +74,17 @@ func (s *StackoverflowScrapper) makeRequest(url string) (*http.Response, error) 
 }
 
 func (s *StackoverflowScrapper) GetUpdate(rurl string) (*domain.Update, error) {
-	parsedUrl, err := url.Parse(rurl)
+	questionID, err := s.getQuestionId(rurl)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse url: %w", uerrors.ErrBadURL)
+		return nil, fmt.Errorf("get question id: %v, %w", err, uerrors.ErrBadURL)
 	}
-	parsedUrl.RawQuery = ""
-	lurl := parsedUrl.String()
+
+	questionUrl := fmt.Sprintf("https://api.stackexchange.com/questions/%s", questionID)
+	resp, err := s.makeRequest(questionUrl)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
 	type item struct {
 		LastActivityDate int64  `json:"last_activity_date"`
@@ -75,26 +94,41 @@ func (s *StackoverflowScrapper) GetUpdate(rurl string) (*domain.Update, error) {
 		Items []item `json:"items"`
 	}
 
-	resp, err := s.makeRequest(lurl)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
 	err = json.NewDecoder(resp.Body).Decode(&upd)
 	if err != nil {
 		return nil, fmt.Errorf("json decoder: %w", err)
 	}
 
 	if len(upd.Items) == 0 {
-		return nil, fmt.Errorf("no items")
+		return nil, fmt.Errorf("no items: %w", uerrors.ErrBadURL)
 	}
 	it := upd.Items[0]
 
 	update := domain.Update{
-		URL:       lurl,
+		URL:       rurl,
 		UpdatedAt: time.Unix(it.LastActivityDate, 0),
 	}
 
 	return &update, nil
+}
+
+func (s *StackoverflowScrapper) getQuestionId(lurl string) (string, error) {
+	u, err := url.Parse(lurl)
+	if err != nil {
+		return "", fmt.Errorf("parse url: %w", err)
+	}
+
+	if u.Scheme != "https" {
+		return "", fmt.Errorf("invalid scheme: %s", u.Scheme)
+	}
+	if u.Host != "stackoverflow.com" {
+		return "", fmt.Errorf("invalid host: %s", u.Host)
+	}
+
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 2 || parts[0] != "questions" {
+		return "", fmt.Errorf("invalid path: %s", u.Path)
+	}
+
+	return parts[1], nil
 }

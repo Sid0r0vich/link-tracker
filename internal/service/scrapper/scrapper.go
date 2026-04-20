@@ -25,11 +25,7 @@ func NewScrapperService(scrappers map[string]Scrapper) *ScrapperService {
 	}
 }
 
-func (m *ScrapperService) AddScrapper(domain string, scrapper Scrapper) {
-	m.scrappers[domain] = scrapper
-}
-
-func (s *ScrapperService) GetUpdate(lurl string) (*domain.Update, error) {
+func (s *ScrapperService) getScrapperForURL(lurl string) (Scrapper, error) {
 	parsedURL, err := url.Parse(lurl)
 	if err != nil {
 		return nil, uerrors.ErrBadURL
@@ -39,6 +35,15 @@ func (s *ScrapperService) GetUpdate(lurl string) (*domain.Update, error) {
 	scrapper, ok := s.scrappers[dom]
 	if !ok {
 		return nil, uerrors.ErrAPINotAlowed
+	}
+
+	return scrapper, nil
+}
+
+func (s *ScrapperService) GetUpdate(lurl string) (*domain.Update, error) {
+	scrapper, err := s.getScrapperForURL(lurl)
+	if err != nil {
+		return nil, err
 	}
 
 	upd, err := scrapper.GetUpdate(lurl)

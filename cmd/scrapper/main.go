@@ -141,8 +141,8 @@ func main() {
 			rpc_handlers.NewUpdatesRPCServer,
 			func(cfg *config.Config, logger *slog.Logger) scrapper.Scrapper {
 				return scrapper.NewScrapperService(map[string]scrapper.Scrapper{
-					"api.github.com":        scrapper.NewGithubScrapper(cfg.Scrapper.GithubToken, logger),
-					"api.stackexchange.com": scrapper.NewStackoverflowScrapper(cfg.Scrapper.StackoverflowKey),
+					"github.com":        scrapper.NewGithubScrapper(cfg.Scrapper.GithubToken, logger),
+					"stackoverflow.com": scrapper.NewStackoverflowScrapper(cfg.Scrapper.StackoverflowKey),
 				})
 			},
 			func(

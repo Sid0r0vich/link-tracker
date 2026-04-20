@@ -16,6 +16,10 @@ type MessageHandler struct {
 }
 
 func getStrs(str string) []string {
+	str = strings.TrimSpace(str)
+	if str == "-" {
+		return []string{}
+	}
 	data := strings.Split(str, ",")
 	for i, s := range data {
 		data[i] = strings.TrimSpace(s)

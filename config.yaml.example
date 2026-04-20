@@ -10,13 +10,11 @@ database:
   max_conn_life_time_mins: 30
 
 bot:
-  token: your-bot-token
+  token: bot-token
   server_addr: link-tracker-bot:1235
 
 scrapper:
   server_addr: link-tracker-scrapper:1234
-  github_token: your-github-token
-  stackoverflow_key: your-stackoverflow-key
   db_access_type: SQL
   transport_protocol: HTTP
   job_delay_interval_seconds: 30

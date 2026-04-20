@@ -6,6 +6,6 @@
             http://www.liquibase.org/xml/ns/dbchangelog
             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
 
-    <include file="001_initial_up.sql"/>
-    <include file="002_fix_tags_up.sql"/>
+    <include file="001_initial.sql"/>
+    <include file="002_fix_tags.sql"/>
 </databaseChangeLog>
