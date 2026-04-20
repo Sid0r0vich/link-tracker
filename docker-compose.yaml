@@ -15,8 +15,10 @@ services:
       - markdown
     restart: unless-stopped
     depends_on:
-      - db
-      - migrations
+      db:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
 
   bot:
     image: sid00r/link-tracker-bot:latest
@@ -33,6 +35,8 @@ services:
     networks:
       - markdown
     restart: unless-stopped
+    depends_on:
+     - scrapper
 
   db:
     image: postgres:17
@@ -48,6 +52,11 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     command: ["postgres", "-c", "log_statement=all"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   migrations:
     image: liquibase/liquibase:4.29
