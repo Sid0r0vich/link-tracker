@@ -2,21 +2,19 @@ package rest
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/delivery"
 	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
 
 type BotRestServer struct {
-	bot bot.API
+	deliveryService *delivery.DeliveryService
 }
 
-func NewBotUpdatesApi(b bot.API) *BotRestServer {
-	return &BotRestServer{
-		bot: b,
-	}
+func NewBotUpdatesApi(deliveryService *delivery.DeliveryService) *BotRestServer {
+	return &BotRestServer{deliveryService: deliveryService}
 }
 
 func (s *BotRestServer) GetUpdate(w http.ResponseWriter, r *http.Request) {
@@ -29,19 +27,5 @@ func (s *BotRestServer) GetUpdate(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 
-	for _, chatID := range req.TgChatIds {
-		msg := fmt.Sprintf("Получено обновление!\nСсылка: %s\n", req.Url)
-
-		for _, event := range req.Data {
-			data := fmt.Sprintf(
-				"Тип: %s\nНазвание: %s\nОписание: %s\nПользователь: %s\nСоздано: %s\n",
-				event.Type,
-				event.Title,
-				event.Description,
-				event.Username,
-				event.CreatedAt,
-			)
-			s.bot.Send(chatID, msg+data)
-		}
-	}
+	s.deliveryService.MakeNewsletter(req.TgChatIds, req.Url, domain.ApiEventSliceToEventSlice(req.Data))
 }

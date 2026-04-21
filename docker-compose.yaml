@@ -5,10 +5,8 @@ services:
       context: .
       dockerfile: ./docker/scrapper/Dockerfile
     container_name: link-tracker-scrapper
-    environment:
-      - SCRAPPER_SERVER_ADDR=$SCRAPPER_SERVER_ADDR
-      - BOT_SERVER_ADDR=$BOT_SERVER_ADDR
-      - CONFIG_FILE=$CONFIG_FILE
+    env_file:
+      - .env
     ports:
       - "1234:1234"
     networks:
@@ -19,6 +17,8 @@ services:
         condition: service_healthy
       migrations:
         condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
 
   bot:
     image: sid00r/link-tracker-bot:latest
@@ -26,25 +26,24 @@ services:
       context: .
       dockerfile: ./docker/bot/Dockerfile
     container_name: link-tracker-bot
-    environment:
-      - SCRAPPER_SERVER_ADDR=$SCRAPPER_SERVER_ADDR
-      - BOT_SERVER_ADDR=$BOT_SERVER_ADDR
-      - CONFIG_FILE=$CONFIG_FILE
+    env_file:
+      - .env
     ports:
       - "1235:1235"
     networks:
       - markdown
     restart: unless-stopped
     depends_on:
-     - scrapper
+      kafka:
+        condition: service_healthy
 
   db:
     image: postgres:17
     restart: always
     environment:
-      POSTGRES_USER: $APP_POSTGRES_USER
-      POSTGRES_PASSWORD: $APP_POSTGRES_PASSWORD
-      POSTGRES_DB: $APP_POSTGRES_DB
+      POSTGRES_USER: $POSTGRES_USER
+      POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+      POSTGRES_DB: $POSTGRES_DB
     ports:
       - "5432:5432"
     networks:
@@ -66,14 +65,39 @@ services:
       - --searchPath=/changesets
       - --changelog-file=master.xml
       - --driver=org.postgresql.Driver
-      - --url=jdbc:postgresql://db:5432/$APP_POSTGRES_DB
-      - --username=$APP_POSTGRES_USER
-      - --password=$APP_POSTGRES_PASSWORD
+      - --url=jdbc:postgresql://db:5432/$POSTGRES_DB
+      - --username=$POSTGRES_USER
+      - --password=$POSTGRES_PASSWORD
       - update
     volumes:
       - ./db/migrations:/changesets
     networks:
       - markdown
+
+  kafka:
+    image: docker.io/bitnamilegacy/kafka:latest
+    container_name: kafka
+    ports:
+      - "9094:9094"
+    environment:
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_PROCESS_ROLES: "broker, controller"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka:9093"
+
+      KAFKA_CFG_LISTENERS: "BROKER://:9094,CONTROLLER://:9093"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "BROKER:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "BROKER"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "BROKER://kafka:9094"
+    networks:
+      - markdown
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka:9094 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
 
 networks:
   markdown:

@@ -79,7 +79,7 @@ type ScrapperRestServer struct {
 	LinkService link_service.LinkService
 }
 
-func NewUpdatesRestServer(
+func NewScrapperRestServer(
 	linkService link_service.LinkService,
 	logger *slog.Logger,
 ) *ScrapperRestServer {

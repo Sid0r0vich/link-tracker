@@ -11,6 +11,7 @@ import (
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot/mocks"
 	server "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/rest"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/delivery"
 	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 	"go.uber.org/mock/gomock"
 )
@@ -22,7 +23,8 @@ func TestBotUpdatesApi_GetUpdate_SendsFormattedMessage(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockAPI := mocks.NewMockAPI(ctrl)
-	h := server.NewBotUpdatesApi(mockAPI)
+	deliveryService := delivery.NewDeliveryService(mockAPI)
+	h := server.NewBotUpdatesApi(deliveryService)
 
 	chatID := int64(123)
 	createdAt := time.Unix(0, 0).UTC()

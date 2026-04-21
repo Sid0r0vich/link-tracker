@@ -9,19 +9,21 @@ import (
 	"github.com/go-co-op/gocron/v2"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	link_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/update"
-	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
 
 type Scrapper interface {
 	GetUpdate(string) (*domain.Update, error)
 }
 
+type Updater interface {
+	SendUpdate(data *domain.UpdateMessage) error
+}
+
 type Scheduler struct {
 	ctx              context.Context
 	linkRepo         link_repository.LinkUpdateRepository
 	logger           *slog.Logger
-	updater          *update.UpdateService
+	updater          Updater
 	scrapper         Scrapper
 	sched            gocron.Scheduler
 	jobDelayInterval time.Duration
@@ -30,7 +32,7 @@ type Scheduler struct {
 func NewScheduler(
 	linkRepo link_repository.LinkUpdateRepository,
 	logger *slog.Logger,
-	updater *update.UpdateService,
+	updater Updater,
 	scrapper Scrapper,
 	jobDelayInterval time.Duration,
 ) (*Scheduler, error) {
@@ -73,14 +75,14 @@ func (s *Scheduler) checkLinkUpdates(lurl string, linkUpd domain.LinkUpdate) err
 	}
 
 	s.logger.Info("get updates", "url", lurl, "pulls", update.Data)
-	data := make([]api.Event, 0)
+	data := make([]domain.Event, 0)
 	for _, event := range update.Data {
 		if event.CreatedAt.After(oldUpdatedAt) && !event.CreatedAt.After(update.UpdatedAt) {
 			data = append(data, event)
 		}
 	}
 
-	res := api.UpdateResponse{
+	res := domain.UpdateMessage{
 		Id:        update.ID,
 		Url:       update.URL,
 		TgChatIds: linkUpd.IDs,

@@ -14,6 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/broker"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/db"
 	rest_handlers "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/rest"
@@ -130,15 +131,35 @@ func main() {
 				fx.As(new(link_repository.LinkRepository)),
 				fx.As(new(link_repository.LinkUpdateRepository)),
 			),
-			func(cfg *config.Config) *update.UpdateService {
-				return update.NewUpdateService(fmt.Sprintf("http://%s", cfg.Bot.ServerAddr))
+			func(cfg *config.Config, logger *slog.Logger) (scheduler.Updater, error) {
+				switch cfg.Scrapper.UpdateCommunicationType {
+				case config.UpdateCommunicationTypeHTTP:
+					return update.NewUpdateRestService(fmt.Sprintf("http://%s", cfg.Bot.ServerAddr))
+				case config.UpdateCommunicationTypeKafka:
+					ctx, cancel := context.WithCancel(context.Background())
+
+					sigterm := make(chan os.Signal, 1)
+					signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
+					go func() {
+						<-sigterm
+						cancel()
+					}()
+
+					producer, err := broker.NewProducer(ctx, broker.NewConfig(cfg), logger, cfg.Kafka.Brokers)
+					if err != nil {
+						return nil, fmt.Errorf("create update producer: %w", err)
+					}
+					return update.NewUpdateBrokerService(producer, cfg.Kafka.Topic), nil
+				default:
+					return nil, fmt.Errorf("invalid update communication type: %s", cfg.Scrapper.UpdateCommunicationType)
+				}
 			},
 			fx.Annotate(
 				link_service.NewLinkService,
 				fx.As(new(link_service.LinkService)),
 			),
-			rest_handlers.NewUpdatesRestServer,
-			rpc_handlers.NewUpdatesRPCServer,
+			rest_handlers.NewScrapperRestServer,
+			rpc_handlers.NewScrapperRPCServer,
 			func(cfg *config.Config, logger *slog.Logger) scrapper.Scrapper {
 				return scrapper.NewScrapperService(map[string]scrapper.Scrapper{
 					"github.com":        scrapper.NewGithubScrapper(cfg.Scrapper.GithubToken, logger),
@@ -149,7 +170,7 @@ func main() {
 				cfg *config.Config,
 				linkRepo link_repository.LinkUpdateRepository,
 				logger *slog.Logger,
-				updater *update.UpdateService,
+				updater scheduler.Updater,
 				scrapper scrapper.Scrapper,
 			) (*scheduler.Scheduler, error) {
 				return scheduler.NewScheduler(linkRepo, logger, updater, scrapper, time.Duration(cfg.Scrapper.JobDelayIntervalSeconds)*time.Second)

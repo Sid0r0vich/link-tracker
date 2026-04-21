@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
 
@@ -67,5 +68,5 @@ func TestGithubScrapper_GetUpdate_NewIssueFormatsEvent(t *testing.T) {
 		CreatedAt:   createdAt,
 	}
 
-	assert.Equal(t, expectedEvent, event)
+	assert.Equal(t, *domain.ApiEventToEvent(&expectedEvent), event)
 }

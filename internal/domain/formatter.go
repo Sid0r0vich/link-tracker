@@ -1,6 +1,7 @@
 package domain
 
 import (
+	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/scrapper/rest"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/scrapper/rpc"
 )
@@ -95,4 +96,36 @@ func RPCLinkResponseToLink(link *rpc.AddLinkRequest) *Link {
 		},
 		URL: link.Url,
 	}
+}
+
+func ApiEventToEvent(e *api.Event) *Event {
+	return &Event{
+		Type:        e.Type,
+		Title:       e.Title,
+		Description: e.Description,
+		Username:    e.Username,
+		CreatedAt:   e.CreatedAt,
+	}
+}
+
+func ApiEventSliceToEventSlice(e []api.Event) []Event {
+	events := make([]Event, len(e))
+	for i, e := range e {
+		events[i] = *ApiEventToEvent(&e)
+	}
+	return events
+}
+
+func EventSliceToApiEventSlice(e []Event) []api.Event {
+	events := make([]api.Event, len(e))
+	for i, event := range e {
+		events[i] = api.Event{
+			Type:        event.Type,
+			Title:       event.Title,
+			Description: event.Description,
+			Username:    event.Username,
+			CreatedAt:   event.CreatedAt,
+		}
+	}
+	return events
 }

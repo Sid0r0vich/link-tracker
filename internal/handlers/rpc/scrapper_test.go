@@ -50,7 +50,7 @@ func TestScrapperRPCServer_GetLinks_Success(t *testing.T) {
 	service := linkmocks.NewMockLinkRepository(ctrl)
 	service.EXPECT().GetLinks(chatID).Return(expected, nil)
 
-	server := server.NewUpdatesRPCServer(service, testLogger())
+	server := server.NewScrapperRPCServer(service, testLogger())
 
 	resp, err := server.GetLinks(context.Background(), &rpc.GetLinksRequest{TgChatId: chatID})
 	require.NoError(t, err)
@@ -70,7 +70,7 @@ func TestScrapperRPCServer_GetLinks_Error(t *testing.T) {
 	service := linkmocks.NewMockLinkRepository(ctrl)
 	service.EXPECT().GetLinks(int64(77)).Return(nil, uerrors.ErrChatNotExists)
 
-	server := server.NewUpdatesRPCServer(service, testLogger())
+	server := server.NewScrapperRPCServer(service, testLogger())
 
 	resp, err := server.GetLinks(context.Background(), &rpc.GetLinksRequest{TgChatId: 77})
 	assert.Nil(t, resp)
@@ -92,7 +92,7 @@ func TestScrapperRPCServer_RegisterDeleteChat(t *testing.T) {
 	service.EXPECT().AddChat(chatID).Return(nil)
 	service.EXPECT().DeleteChat(chatID).Return(nil)
 
-	server := server.NewUpdatesRPCServer(service, testLogger())
+	server := server.NewScrapperRPCServer(service, testLogger())
 
 	registerResp, registerErr := server.RegisterChat(context.Background(), &rpc.RegisterChatRequest{Id: chatID})
 	deleteResp, deleteErr := server.DeleteChat(context.Background(), &rpc.DeleteChatRequest{Id: chatID})
@@ -123,7 +123,7 @@ func TestScrapperRPCServer_AddLink_Success(t *testing.T) {
 		URL: url,
 	}).Return(linkID, nil)
 
-	server := server.NewUpdatesRPCServer(service, testLogger())
+	server := server.NewScrapperRPCServer(service, testLogger())
 
 	resp, err := server.AddLink(context.Background(), &rpc.AddLinkRequest{
 		TgChatId: chatID,
@@ -154,7 +154,7 @@ func TestScrapperRPCServer_RemoveLink_Error(t *testing.T) {
 	service := linkmocks.NewMockLinkRepository(ctrl)
 	service.EXPECT().DeleteLink(chatID, url).Return(nil, uerrors.ErrLinkNotFound)
 
-	server := server.NewUpdatesRPCServer(service, testLogger())
+	server := server.NewScrapperRPCServer(service, testLogger())
 
 	resp, err := server.RemoveLink(context.Background(), &rpc.RemoveLinkRequest{TgChatId: chatID, Link: url})
 	assert.Nil(t, resp)
@@ -186,7 +186,7 @@ func TestScrapperRPCServer_RemoveLink_Success(t *testing.T) {
 	service := linkmocks.NewMockLinkRepository(ctrl)
 	service.EXPECT().DeleteLink(chatID, expected.URL).Return(expected, nil)
 
-	server := server.NewUpdatesRPCServer(service, testLogger())
+	server := server.NewScrapperRPCServer(service, testLogger())
 
 	resp, err := server.RemoveLink(context.Background(), &rpc.RemoveLinkRequest{TgChatId: chatID, Link: expected.URL})
 	require.NoError(t, err)

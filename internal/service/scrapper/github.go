@@ -13,7 +13,6 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/utils"
-	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
 
 type GithubScrapper struct {
@@ -106,20 +105,12 @@ func (s *GithubScrapper) GetUpdate(url string) (*domain.Update, error) {
 		return nil, fmt.Errorf("json decoder: %w", err)
 	}
 
-<<<<<<< HEAD
 	pulls, err := s.getEvents(repo, "pulls")
-=======
-	pulls, err := s.getEvents(url+"/pulls", "pull request")
->>>>>>> b203e41 (feat: fix hw-4)
 	if err != nil {
 		return nil, fmt.Errorf("get pulls: %w", err)
 	}
 
-<<<<<<< HEAD
 	issues, err := s.getEvents(repo, "issues")
-=======
-	issues, err := s.getEvents(url+"/issues", "issue")
->>>>>>> b203e41 (feat: fix hw-4)
 	if err != nil {
 		return nil, fmt.Errorf("get issues: %w", err)
 	}
@@ -167,7 +158,7 @@ func (s *GithubScrapper) getRepository(lurl string) (*githubRepository, error) {
 	}, nil
 }
 
-func (s *GithubScrapper) getEvents(repo *githubRepository, typ string) ([]api.Event, error) {
+func (s *GithubScrapper) getEvents(repo *githubRepository, typ string) ([]domain.Event, error) {
 	type user struct {
 		Login string `json:"login"`
 	}
@@ -203,9 +194,9 @@ func (s *GithubScrapper) getEvents(repo *githubRepository, typ string) ([]api.Ev
 		return nil, fmt.Errorf("json decoder: %w", err)
 	}
 
-	result := make([]api.Event, 0)
+	result := make([]domain.Event, 0)
 	for _, pl := range pulls {
-		result = append(result, api.Event{
+		result = append(result, domain.Event{
 			Type:        humanType,
 			CreatedAt:   pl.CreatedAt,
 			Title:       pl.Title,

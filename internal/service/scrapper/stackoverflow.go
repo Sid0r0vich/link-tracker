@@ -12,7 +12,6 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/utils"
-	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
 
 type StackoverflowScrapper struct {
@@ -158,7 +157,7 @@ func (s *StackoverflowScrapper) getQuestionId(lurl string) (string, error) {
 	return parts[1], nil
 }
 
-func (s *StackoverflowScrapper) getEvents(questionID string, typ string, title string) ([]api.Event, error) {
+func (s *StackoverflowScrapper) getEvents(questionID string, typ string, title string) ([]domain.Event, error) {
 	type Owner struct {
 		DisplayName string `json:"display_name"`
 	}
@@ -198,9 +197,9 @@ func (s *StackoverflowScrapper) getEvents(questionID string, typ string, title s
 		return nil, fmt.Errorf("json decoder: %w", err)
 	}
 
-	events := make([]api.Event, 0)
+	events := make([]domain.Event, 0)
 	for _, answer := range apiResponse.Items {
-		events = append(events, api.Event{
+		events = append(events, domain.Event{
 			Type:        humanType,
 			CreatedAt:   time.Unix(answer.CreationDate, 0),
 			Title:       title,

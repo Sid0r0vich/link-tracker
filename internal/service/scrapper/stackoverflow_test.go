@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
 
@@ -71,7 +72,7 @@ func TestStackoverflowScrapper_GetUpdate_NewAnswerFormatsEvent(t *testing.T) {
 		CreatedAt:   time.Unix(creationDate, 0),
 	}
 
-	assert.Equal(t, expectedEvent, event)
+	assert.Equal(t, *domain.ApiEventToEvent(&expectedEvent), event)
 }
 
 func int64ToString(v int64) string {

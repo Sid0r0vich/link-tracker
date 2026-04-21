@@ -59,7 +59,7 @@ func TestScrapperRestServer_GetLinks_Success(t *testing.T) {
 	service := linkmocks.NewMockLinkRepository(ctrl)
 	service.EXPECT().GetLinks(chatID).Return(expected, nil)
 
-	server := server.NewUpdatesRestServer(service, testLogger())
+	server := server.NewScrapperRestServer(service, testLogger())
 	request := httptest.NewRequest(http.MethodGet, "/links", nil)
 	response := httptest.NewRecorder()
 
@@ -86,7 +86,7 @@ func TestScrapperRestServer_GetLinks_Error(t *testing.T) {
 	service := linkmocks.NewMockLinkRepository(ctrl)
 	service.EXPECT().GetLinks(int64(77)).Return(nil, uerrors.ErrChatNotExists)
 
-	server := server.NewUpdatesRestServer(service, testLogger())
+	server := server.NewScrapperRestServer(service, testLogger())
 	request := httptest.NewRequest(http.MethodGet, "/links", nil)
 	response := httptest.NewRecorder()
 
@@ -111,7 +111,7 @@ func TestScrapperRestServer_ChatHandlers(t *testing.T) {
 	service.EXPECT().AddChat(chatID).Return(nil)
 	service.EXPECT().DeleteChat(chatID).Return(nil)
 
-	server := server.NewUpdatesRestServer(service, testLogger())
+	server := server.NewScrapperRestServer(service, testLogger())
 
 	postRequest := httptest.NewRequest(http.MethodPost, "/tg-chat", nil)
 	postResponse := httptest.NewRecorder()
@@ -144,7 +144,7 @@ func TestScrapperRestServer_AddLink_Success(t *testing.T) {
 		URL: url,
 	}).Return(linkID, nil)
 
-	server := server.NewUpdatesRestServer(service, testLogger())
+	server := server.NewScrapperRestServer(service, testLogger())
 	requestBody, err := json.Marshal(domain.Link{
 		LinkInfo: domain.LinkInfo{
 			Tags:    tags,
@@ -184,7 +184,7 @@ func TestScrapperRestServer_RemoveLink_Error(t *testing.T) {
 	service := linkmocks.NewMockLinkRepository(ctrl)
 	service.EXPECT().DeleteLink(chatID, url).Return(nil, uerrors.ErrLinkNotFound)
 
-	server := server.NewUpdatesRestServer(service, testLogger())
+	server := server.NewScrapperRestServer(service, testLogger())
 	body, err := json.Marshal(api.RemoveLinkRequest{Link: &url})
 	require.NoError(t, err)
 
@@ -222,7 +222,7 @@ func TestScrapperRestServer_RemoveLink_Success(t *testing.T) {
 	service := linkmocks.NewMockLinkRepository(ctrl)
 	service.EXPECT().DeleteLink(chatID, expected.URL).Return(expected, nil)
 
-	server := server.NewUpdatesRestServer(service, testLogger())
+	server := server.NewScrapperRestServer(service, testLogger())
 	body, err := json.Marshal(api.RemoveLinkRequest{Link: &expected.URL})
 	require.NoError(t, err)
 

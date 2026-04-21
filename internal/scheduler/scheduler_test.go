@@ -44,7 +44,8 @@ func TestScheduler_CheckUpdates_PartialFailuresAreIsolated(t *testing.T) {
 	}))
 	defer server.Close()
 
-	updater := update.NewUpdateService(server.URL)
+	updater, err := update.NewUpdateRestService(server.URL)
+	assert.NoError(t, err)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	repo := repoMock.NewMockLinkUpdateRepository(ctrl)
 	scr := scrapperMock.NewMockScrapper(ctrl)
@@ -62,7 +63,7 @@ func TestScheduler_CheckUpdates_PartialFailuresAreIsolated(t *testing.T) {
 
 	scr.EXPECT().GetUpdate(failUrl).Return(nil, errors.New("upstream unavailable"))
 
-	event := api.Event{
+	event := domain.Event{
 		Type:        "issue",
 		Title:       "title",
 		Username:    "name",
@@ -73,7 +74,7 @@ func TestScheduler_CheckUpdates_PartialFailuresAreIsolated(t *testing.T) {
 		ID:        7,
 		URL:       okUrl,
 		UpdatedAt: eventTime,
-		Data:      []api.Event{event},
+		Data:      []domain.Event{event},
 	}
 	scr.EXPECT().GetUpdate(okUrl).Return(&upd, nil)
 
@@ -95,5 +96,5 @@ func TestScheduler_CheckUpdates_PartialFailuresAreIsolated(t *testing.T) {
 	assert.Equal(t, okUrl, gotUpdResp.Url)
 	assert.Equal(t, okChatIDs, gotUpdResp.TgChatIds)
 	assert.Equal(t, 1, len(gotUpdResp.Data))
-	assert.Equal(t, event, gotUpdResp.Data[0])
+	assert.Equal(t, event, *domain.ApiEventToEvent(&gotUpdResp.Data[0]))
 }

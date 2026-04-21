@@ -6,26 +6,32 @@ import (
 	"fmt"
 	"net/http"
 
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
 
-type UpdateService struct {
+type UpdateRestService struct {
 	client api.ClientWithResponsesInterface
 }
 
-func NewUpdateService(serverAddr string) *UpdateService {
+func NewUpdateRestService(serverAddr string) (*UpdateRestService, error) {
 	c, err := api.NewClientWithResponses(serverAddr)
 	if err != nil {
-		panic(fmt.Sprintf("update service create: %v", err))
+		return nil, fmt.Errorf("update service create: %w", err)
 	}
 
-	return &UpdateService{client: c}
+	return &UpdateRestService{client: c}, nil
 }
 
-func (s *UpdateService) SendUpdate(data *api.UpdateResponse) error {
+func (s *UpdateRestService) SendUpdate(data *domain.UpdateMessage) error {
 	ctx := context.Background()
 
-	resp, err := s.client.PostUpdatesWithResponse(ctx, *data)
+	resp, err := s.client.PostUpdatesWithResponse(ctx, api.PostUpdatesJSONRequestBody{
+		Id:        data.Id,
+		TgChatIds: data.TgChatIds,
+		Url:       data.Url,
+		Data:      domain.EventSliceToApiEventSlice(data.Data),
+	})
 	if err != nil {
 		return fmt.Errorf("response: %w", err)
 	}

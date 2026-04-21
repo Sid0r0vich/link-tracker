@@ -16,13 +16,15 @@ bot:
 
 scrapper:
   server_addr: link-tracker-scrapper:1234
+  #github_token: ???
+  #stackoverflow_key: ???
   db_access_type: SQL
   transport_protocol: HTTP
   job_delay_interval_seconds: 30
-  #update_communication_type: kafka
+  update_communication_type: kafka
 
 kafka:
   brokers:
-    - broker:29092
+    - kafka:9094
   topic: updates
   group_id: 1

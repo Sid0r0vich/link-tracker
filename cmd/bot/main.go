@@ -5,23 +5,31 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/gorilla/mux"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/adapter/scrapper"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/broker"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/chat"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
+	brokerhandler "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/broker"
 	handlers "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/rest"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/logs"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/middleware"
 	state_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/state"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/delivery"
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func startServer(cfg *config.Config, api *handlers.BotRestServer, logger *slog.Logger) {
+func startServer(cfg *config.Config, deliveryService *delivery.DeliveryService, logger *slog.Logger) {
+	api := handlers.NewBotUpdatesApi(deliveryService)
+
 	r := mux.NewRouter()
 	r.HandleFunc("/updates", api.GetUpdate).Methods("POST")
 
@@ -31,7 +39,12 @@ func startServer(cfg *config.Config, api *handlers.BotRestServer, logger *slog.L
 	}
 }
 
-func run(cfg *config.Config, chatController *chat.ChatController, logger *slog.Logger, api *handlers.BotRestServer) error {
+func startConsumer(ctx context.Context, cfg *config.Config, deliveryService *delivery.DeliveryService, logger *slog.Logger) error {
+	handler := brokerhandler.NewBotMessageHandler(deliveryService, logger)
+	return broker.StartConsumerGroup(ctx, broker.NewConfig(cfg), logger, cfg.Kafka.Brokers, cfg.Kafka.GroupID, cfg.Kafka.Topic, handler.Handle)
+}
+
+func run(cfg *config.Config, chatController *chat.ChatController, deliveryService *delivery.DeliveryService, logger *slog.Logger) error {
 	botCommands := make([]tgbotapi.BotCommand, 0, len(bot.CmdToHandler))
 	for name, command := range bot.CmdToHandler {
 		botCommands = append(botCommands, tgbotapi.BotCommand{Command: name, Description: command.Desc})
@@ -43,7 +56,22 @@ func run(cfg *config.Config, chatController *chat.ChatController, logger *slog.L
 	}
 
 	go func() {
-		startServer(cfg, api, logger)
+		switch cfg.Scrapper.UpdateCommunicationType {
+		case config.UpdateCommunicationTypeHTTP:
+			startServer(cfg, deliveryService, logger)
+
+		case config.UpdateCommunicationTypeKafka:
+			ctx, cancel := context.WithCancel(context.Background())
+
+			sigterm := make(chan os.Signal, 1)
+			signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
+			go func() {
+				<-sigterm
+				cancel()
+			}()
+
+			startConsumer(ctx, cfg, deliveryService, logger)
+		}
 	}()
 
 	updates := chatController.GetUpdatesChan()
@@ -108,7 +136,7 @@ func main() {
 			func(b *chat.ChatController) bot.API {
 				return b
 			},
-			handlers.NewBotUpdatesApi,
+			delivery.NewDeliveryService,
 		),
 		fx.Invoke(run),
 	).Run()

@@ -40,10 +40,27 @@ func (d TransportProtocol) IsValid() bool {
 	}
 }
 
+type UpdateCommunicationType string
+
+const (
+	UpdateCommunicationTypeKafka UpdateCommunicationType = "kafka"
+	UpdateCommunicationTypeHTTP  UpdateCommunicationType = "HTTP"
+)
+
+func (d UpdateCommunicationType) IsValid() bool {
+	switch d {
+	case UpdateCommunicationTypeKafka, UpdateCommunicationTypeHTTP:
+		return true
+	default:
+		return false
+	}
+}
+
 type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
 	Bot      BotConfig      `mapstructure:"bot"`
 	Scrapper ScrapperConfig `mapstructure:"scrapper"`
+	Kafka    KafkaConfig    `mapstructure:"kafka"`
 }
 
 type DatabaseConfig struct {
@@ -65,12 +82,19 @@ type BotConfig struct {
 }
 
 type ScrapperConfig struct {
-	ServerAddr              string            `mapstructure:"server_addr"`
-	GithubToken             string            `mapstructure:"github_token"`
-	StackoverflowKey        string            `mapstructure:"stackoverflow_key"`
-	DBAccessType            DBAccessType      `mapstructure:"db_access_type"`
-	TransportProtocol       TransportProtocol `mapstructure:"transport_protocol"`
-	JobDelayIntervalSeconds int               `mapstructure:"job_delay_interval_seconds"`
+	ServerAddr              string                  `mapstructure:"server_addr"`
+	GithubToken             string                  `mapstructure:"github_token"`
+	StackoverflowKey        string                  `mapstructure:"stackoverflow_key"`
+	DBAccessType            DBAccessType            `mapstructure:"db_access_type"`
+	TransportProtocol       TransportProtocol       `mapstructure:"transport_protocol"`
+	JobDelayIntervalSeconds int                     `mapstructure:"job_delay_interval_seconds"`
+	UpdateCommunicationType UpdateCommunicationType `mapstructure:"update_communication_type"`
+}
+
+type KafkaConfig struct {
+	Brokers []string `mapstructure:"brokers"`
+	Topic   string   `mapstructure:"topic"`
+	GroupID string   `mapstructure:"group_id"`
 }
 
 func LoadConfig(logger *slog.Logger) (*Config, error) {
@@ -91,6 +115,13 @@ func newConfigFromFile(name string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigType("yaml")
 	v.SetConfigFile(name)
+	viper.AutomaticEnv()
+
+	v.BindEnv("database.username", "POSTGRES_USER")
+	v.BindEnv("database.password", "POSTGRES_PASSWORD")
+	v.BindEnv("database.name", "POSTGRES_DB")
+	v.BindEnv("bot.server_addr", "BOT_SERVER_ADDR")
+	v.BindEnv("scrapper.server_addr", "SCRAPPER_SERVER_ADDR")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config file: %w", err)
@@ -106,6 +137,10 @@ func newConfigFromFile(name string) (*Config, error) {
 
 	if !cfg.Scrapper.TransportProtocol.IsValid() {
 		return nil, fmt.Errorf("invalid transport protocol: %s", cfg.Scrapper.TransportProtocol)
+	}
+
+	if !cfg.Scrapper.UpdateCommunicationType.IsValid() {
+		return nil, fmt.Errorf("invalid update communication type: %s", cfg.Scrapper.UpdateCommunicationType)
 	}
 
 	return cfg, nil

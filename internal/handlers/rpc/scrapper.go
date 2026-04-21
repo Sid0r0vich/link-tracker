@@ -56,7 +56,7 @@ type ScrapperRPCServer struct {
 	Logger      *slog.Logger
 }
 
-func NewUpdatesRPCServer(
+func NewScrapperRPCServer(
 	linkService link_service.LinkService,
 	logger *slog.Logger,
 ) *ScrapperRPCServer {
