@@ -120,8 +120,6 @@ func newConfigFromFile(name string) (*Config, error) {
 	v.BindEnv("database.username", "POSTGRES_USER")
 	v.BindEnv("database.password", "POSTGRES_PASSWORD")
 	v.BindEnv("database.name", "POSTGRES_DB")
-	v.BindEnv("bot.server_addr", "BOT_SERVER_ADDR")
-	v.BindEnv("scrapper.server_addr", "SCRAPPER_SERVER_ADDR")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config file: %w", err)

@@ -11,13 +11,11 @@ database:
   subscription_batch_size: 100
 
 bot:
-  token: bot-token
+  token: # введите ваш токен телеграм бота
   server_addr: link-tracker-bot:1235
 
 scrapper:
   server_addr: link-tracker-scrapper:1234
-  #github_token: ???
-  #stackoverflow_key: ???
   db_access_type: SQL
   transport_protocol: HTTP
   job_delay_interval_seconds: 30
@@ -25,6 +23,8 @@ scrapper:
 
 kafka:
   brokers:
-    - kafka:9094
+    - kafka-1:9094
+    - kafka-2:9094
+    - kafka-3:9094
   topic: updates
   group_id: 1

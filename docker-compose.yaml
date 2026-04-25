@@ -7,8 +7,6 @@ services:
     container_name: link-tracker-scrapper
     env_file:
       - .env
-    ports:
-      - "1234:1234"
     networks:
       - markdown
     restart: unless-stopped
@@ -17,7 +15,11 @@ services:
         condition: service_healthy
       migrations:
         condition: service_completed_successfully
-      kafka:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
         condition: service_healthy
 
   bot:
@@ -28,13 +30,15 @@ services:
     container_name: link-tracker-bot
     env_file:
       - .env
-    ports:
-      - "1235:1235"
     networks:
       - markdown
     restart: unless-stopped
     depends_on:
-      kafka:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
         condition: service_healthy
 
   db:
@@ -74,26 +78,64 @@ services:
     networks:
       - markdown
 
-  kafka:
+  kafka-1:
     image: docker.io/bitnamilegacy/kafka:latest
-    container_name: kafka
-    ports:
-      - "9094:9094"
     environment:
+      KAFKA_CLUSTER_ID: 0
       KAFKA_CFG_NODE_ID: 0
       KAFKA_CFG_PROCESS_ROLES: "broker, controller"
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka:9093"
-
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka-1:9093,1@kafka-2:9093,2@kafka-3:9093"
       KAFKA_CFG_LISTENERS: "BROKER://:9094,CONTROLLER://:9093"
       KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "BROKER:PLAINTEXT,CONTROLLER:PLAINTEXT"
-      
       KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "BROKER"
       KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
-      KAFKA_CFG_ADVERTISED_LISTENERS: "BROKER://kafka:9094"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "BROKER://kafka-1:9094"
     networks:
       - markdown
     healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka:9094 || exit 1"]
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka-1:9094 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+
+  kafka-2:
+    image: docker.io/bitnamilegacy/kafka:latest
+    environment:
+      KAFKA_CLUSTER_ID: 0
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_PROCESS_ROLES: "broker, controller"
+      KAFKA_CFG_LISTENERS: "BROKER://:9094,CONTROLLER://:9093"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "BROKER:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "BROKER"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "BROKER://kafka-2:9094"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka-1:9093,1@kafka-2:9093,2@kafka-3:9093"
+    networks:
+      - markdown
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka-2:9094 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+
+  kafka-3:
+    image: docker.io/bitnamilegacy/kafka:latest
+    environment:
+      KAFKA_CLUSTER_ID: 0
+      KAFKA_CFG_NODE_ID: 2
+      KAFKA_CFG_PROCESS_ROLES: "broker, controller"
+      KAFKA_CFG_LISTENERS: "BROKER://:9094,CONTROLLER://:9093"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "BROKER:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "BROKER"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "BROKER://kafka-3:9094"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka-1:9093,1@kafka-2:9093,2@kafka-3:9093"
+    networks:
+      - markdown
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka-3:9094 || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 10
