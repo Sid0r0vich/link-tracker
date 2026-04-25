@@ -28,3 +28,6 @@ kafka:
     - kafka-3:9094
   topic: updates
   group_id: 1
+  num_partitions: 1
+  retention_ms: 86400000
+  min_insync_replicas: 2

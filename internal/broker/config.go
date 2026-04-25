@@ -17,6 +17,8 @@ func NewConfig(appCfg *config.Config, opts ...func(*sarama.Config)) *sarama.Conf
 	cfg.Consumer.Offsets.Initial = sarama.OffsetNewest
 	cfg.Consumer.Offsets.AutoCommit.Enable = false
 
+	cfg.Metadata.AllowAutoTopicCreation = false
+
 	for _, o := range opts {
 		o(cfg)
 	}

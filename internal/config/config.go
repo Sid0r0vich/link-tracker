@@ -92,9 +92,12 @@ type ScrapperConfig struct {
 }
 
 type KafkaConfig struct {
-	Brokers []string `mapstructure:"brokers"`
-	Topic   string   `mapstructure:"topic"`
-	GroupID string   `mapstructure:"group_id"`
+	Brokers           []string `mapstructure:"brokers"`
+	Topic             string   `mapstructure:"topic"`
+	GroupID           string   `mapstructure:"group_id"`
+	NumPartitions     int32    `mapstructure:"num_partitions"`
+	RetentionMs       int      `mapstructure:"retention_ms"`
+	MinInsyncReplicas int      `mapstructure:"min_insync_replicas"`
 }
 
 func LoadConfig(logger *slog.Logger) (*Config, error) {

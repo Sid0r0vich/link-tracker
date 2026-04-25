@@ -51,6 +51,10 @@ func run(
 		sched.Shutdown()
 	}()
 
+	if err := os.WriteFile("/tmp/ready", []byte("1"), 0644); err != nil {
+		return fmt.Errorf("write ready file: %w", err)
+	}
+
 	switch cfg.Scrapper.TransportProtocol {
 	case config.TransportProtocolHTTP:
 		handler := rest.HandlerWithOptions(restAPI, rest.StdHTTPServerOptions{})
@@ -145,7 +149,9 @@ func main() {
 						cancel()
 					}()
 
-					producer, err := broker.NewProducer(ctx, broker.NewConfig(cfg), logger, cfg.Kafka.Brokers)
+					saramaCfg := broker.NewConfig(cfg)
+					broker.CreateTopicIfNotExists(cfg.Kafka, saramaCfg)
+					producer, err := broker.NewProducer(ctx, saramaCfg, logger, cfg.Kafka.Brokers)
 					if err != nil {
 						return nil, fmt.Errorf("create update producer: %w", err)
 					}

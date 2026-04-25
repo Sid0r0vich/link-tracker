@@ -97,6 +97,7 @@ func (s *ScrapperRPCServer) RegisterChat(ctx context.Context, req *rpc.RegisterC
 
 	return &emptypb.Empty{}, nil
 }
+
 func (s *ScrapperRPCServer) DeleteChat(ctx context.Context, req *rpc.DeleteChatRequest) (*emptypb.Empty, error) {
 	err := s.LinkService.DeleteChat(req.GetId())
 	if err != nil {
@@ -106,6 +107,7 @@ func (s *ScrapperRPCServer) DeleteChat(ctx context.Context, req *rpc.DeleteChatR
 
 	return &emptypb.Empty{}, nil
 }
+
 func (s *ScrapperRPCServer) AddLink(ctx context.Context, req *rpc.AddLinkRequest) (*rpc.LinkResponse, error) {
 	link := domain.RPCLinkResponseToLink(req)
 
@@ -124,6 +126,7 @@ func (s *ScrapperRPCServer) AddLink(ctx context.Context, req *rpc.AddLinkRequest
 
 	return resp, nil
 }
+
 func (s *ScrapperRPCServer) RemoveLink(ctx context.Context, req *rpc.RemoveLinkRequest) (*rpc.LinkResponse, error) {
 	link, err := s.LinkService.DeleteLink(req.TgChatId, req.Link)
 	if err != nil {
