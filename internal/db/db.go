@@ -32,18 +32,18 @@ func Migrate(cfg *pgx.ConnConfig) error {
 	return nil
 }
 
-func GetDSNFromConfig(cfg *config.Config) string {
+func GetDSNFromConfig(cfg *config.DatabaseConfig) string {
 	return fmt.Sprintf(
 		"postgres://%s:%s@%s:%d/%s?target_session_attrs=read-write&sslmode=disable",
-		cfg.Database.Username,
-		cfg.Database.Password,
-		cfg.Database.Host,
-		cfg.Database.Port,
-		cfg.Database.Name,
+		cfg.Username,
+		cfg.Password,
+		cfg.Host,
+		cfg.Port,
+		cfg.Name,
 	)
 }
 
-func GetConnCfg(cfg *config.Config) (*pgxpool.Config, error) {
+func GetConnCfg(cfg *config.DatabaseConfig) (*pgxpool.Config, error) {
 	dsn := GetDSNFromConfig(cfg)
 
 	connCfg, err := pgxpool.ParseConfig(dsn)
@@ -51,10 +51,10 @@ func GetConnCfg(cfg *config.Config) (*pgxpool.Config, error) {
 		return nil, fmt.Errorf("connect to db: %w", err)
 	}
 
-	connCfg.MaxConns = int32(cfg.Database.MaxConns)
-	connCfg.MinConns = int32(cfg.Database.MinConns)
-	connCfg.MaxConnIdleTime = time.Duration(cfg.Database.MaxConnIdleTimeMins) * time.Minute
-	connCfg.MaxConnLifetime = time.Duration(cfg.Database.MaxConnLifeTimeMins) * time.Minute
+	connCfg.MaxConns = int32(cfg.MaxConns)
+	connCfg.MinConns = int32(cfg.MinConns)
+	connCfg.MaxConnIdleTime = time.Duration(cfg.MaxConnIdleTimeMins) * time.Minute
+	connCfg.MaxConnLifetime = time.Duration(cfg.MaxConnLifeTimeMins) * time.Minute
 
 	return connCfg, nil
 }

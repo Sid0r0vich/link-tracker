@@ -12,9 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/broker"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/db"
 	rest_handlers "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/rest"
@@ -36,7 +34,6 @@ import (
 
 func run(
 	cfg *config.Config,
-	connCfg *pgxpool.Config,
 	logger *slog.Logger,
 	sched *scheduler.Scheduler,
 	restAPI *rest_handlers.ScrapperRestServer,
@@ -81,81 +78,112 @@ func run(
 	return nil
 }
 
-func main() {
-	fx.New(
-		//fx.NopLogger,
+func NewSQLRepo(
+	cfg *config.DatabaseConfig,
+	lifecycle fx.Lifecycle,
+	logger *slog.Logger,
+) (link_repository.LinkUnitedRepository, func() error, error) {
+	pgxCfg, err := db.GetConnCfg(cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get pgx pool config: %w", err)
+	}
+
+	pool, err := db.GetDBPoolConn(pgxCfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("connect to db: %w", err)
+	}
+
+	return sql_link_repo.NewSqlLinkService(pool, cfg.SubscriptionBatchSize), func() error {
+		db.CloseDBConn()
+		return nil
+	}, nil
+}
+
+func NewORMRepo(
+	cfg *config.DatabaseConfig,
+	lifecycle fx.Lifecycle,
+	logger *slog.Logger,
+) (link_repository.LinkUnitedRepository, func() error, error) {
+	db, err := sql.Open("pgx", db.GetDSNFromConfig(cfg))
+	if err != nil {
+		return nil, nil, fmt.Errorf("fail to open database: %v", err)
+	}
+
+	return orm_link_repo.NewORMLinkService(db, cfg.SubscriptionBatchSize), db.Close, nil
+}
+
+func getContext(lifecycle fx.Lifecycle) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	lifecycle.Append(fx.Hook{
+		OnStop: func(context.Context) error {
+			cancel()
+			return nil
+		},
+	})
+
+	return ctx
+}
+
+func NewScrapper(cfg *config.Config, logger *slog.Logger) scrapper.Scrapper {
+	return scrapper.NewScrapperService(map[string]scrapper.Scrapper{
+		"github.com":        scrapper.NewGithubScrapper(cfg.Scrapper.GithubToken, logger),
+		"stackoverflow.com": scrapper.NewStackoverflowScrapper(cfg.Scrapper.StackoverflowKey),
+	})
+}
+
+func NewApp() *fx.App {
+	return fx.New(
 		fx.Provide(
+			getContext,
 			config.LoadConfig,
 			logs.NewLogger,
-			db.GetConnCfg,
 			fx.Annotate(
 				func(
 					cfg *config.Config,
-					pgxCfg *pgxpool.Config,
 					lifecycle fx.Lifecycle,
 					logger *slog.Logger,
 				) (link_repository.LinkUnitedRepository, error) {
+					var repo link_repository.LinkUnitedRepository
+					var close func() error
+					var err error
 					switch cfg.Scrapper.DBAccessType {
 					case "SQL":
-						pool, err := db.GetDBPoolConn(pgxCfg)
+						repo, close, err = NewSQLRepo(&cfg.Database, lifecycle, logger)
 						if err != nil {
-							return nil, fmt.Errorf("connect to db: %w", err)
+							return nil, fmt.Errorf("failed to create SQL repo: %w", err)
 						}
-
-						lifecycle.Append(fx.Hook{
-							OnStop: func(context.Context) error {
-								db.CloseDBConn()
-								logger.Info("database connection closed")
-								return nil
-							},
-						})
-
-						return sql_link_repo.NewSqlLinkService(pool, cfg.Database.SubscriptionBatchSize), nil
-
 					case "ORM":
-						db, err := sql.Open("pgx", db.GetDSNFromConfig(cfg))
+						repo, close, err = NewORMRepo(&cfg.Database, lifecycle, logger)
 						if err != nil {
-							return nil, fmt.Errorf("fail to open database: %v", err)
+							return nil, fmt.Errorf("failed to create ORM repo: %w", err)
 						}
-
-						lifecycle.Append(fx.Hook{
-							OnStop: func(context.Context) error {
-								db.Close()
-								logger.Info("database connection closed")
-								return nil
-							},
-						})
-
-						return orm_link_repo.NewORMLinkService(db, cfg.Database.SubscriptionBatchSize), nil
-
 					default:
 						return nil, fmt.Errorf("invalid db access type: %s", cfg.Scrapper.DBAccessType)
 					}
+
+					lifecycle.Append(fx.Hook{
+						OnStop: func(context.Context) error {
+							return close()
+						},
+					})
+
+					return repo, nil
 				},
 				fx.As(new(link_repository.LinkRepository)),
 				fx.As(new(link_repository.LinkUpdateRepository)),
 			),
-			func(cfg *config.Config, logger *slog.Logger) (scheduler.Updater, error) {
+			func(
+				ctx context.Context,
+				cfg *config.Config,
+				lifecycle fx.Lifecycle,
+				logger *slog.Logger,
+			) (scheduler.Updater, error) {
 				switch cfg.Scrapper.UpdateCommunicationType {
 				case config.UpdateCommunicationTypeHTTP:
 					return update.NewUpdateRestService(fmt.Sprintf("http://%s", cfg.Bot.ServerAddr))
 				case config.UpdateCommunicationTypeKafka:
-					ctx, cancel := context.WithCancel(context.Background())
-
-					sigterm := make(chan os.Signal, 1)
-					signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
-					go func() {
-						<-sigterm
-						cancel()
-					}()
-
-					saramaCfg := broker.NewConfig(cfg)
-					broker.CreateTopicIfNotExists(cfg.Kafka, saramaCfg)
-					producer, err := broker.NewProducer(ctx, saramaCfg, logger, cfg.Kafka.Brokers)
-					if err != nil {
-						return nil, fmt.Errorf("create update producer: %w", err)
-					}
-					return update.NewUpdateBrokerService(producer, cfg.Kafka.Topic), nil
+					return update.NewUpdateBrokerService(ctx, &cfg.Kafka, logger)
 				default:
 					return nil, fmt.Errorf("invalid update communication type: %s", cfg.Scrapper.UpdateCommunicationType)
 				}
@@ -166,12 +194,7 @@ func main() {
 			),
 			rest_handlers.NewScrapperRestServer,
 			rpc_handlers.NewScrapperRPCServer,
-			func(cfg *config.Config, logger *slog.Logger) scrapper.Scrapper {
-				return scrapper.NewScrapperService(map[string]scrapper.Scrapper{
-					"github.com":        scrapper.NewGithubScrapper(cfg.Scrapper.GithubToken, logger),
-					"stackoverflow.com": scrapper.NewStackoverflowScrapper(cfg.Scrapper.StackoverflowKey),
-				})
-			},
+			NewScrapper,
 			func(
 				cfg *config.Config,
 				linkRepo link_repository.LinkUpdateRepository,
@@ -183,5 +206,9 @@ func main() {
 			},
 		),
 		fx.Invoke(run),
-	).Run()
+	)
+}
+
+func main() {
+	NewApp().Run()
 }

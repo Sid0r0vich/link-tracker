@@ -57,7 +57,7 @@ func (s *KafkaTestSuite) newTopicName(prefix string) string {
 func (s *KafkaTestSuite) TestCreateTopicIfNotExists_Idempotent() {
 	topic := s.newTopicName("links")
 
-	kafkaCfg := config.KafkaConfig{
+	kafkaCfg := &config.KafkaConfig{
 		Brokers:           s.brokers,
 		Topic:             topic,
 		NumPartitions:     1,
@@ -87,7 +87,7 @@ func (s *KafkaTestSuite) TestStartConsumerGroup_ConsumesMessage() {
 	groupID := s.newTopicName("group")
 	payload := []byte("integration-message")
 
-	kafkaCfg := config.KafkaConfig{
+	kafkaCfg := &config.KafkaConfig{
 		Brokers:           s.brokers,
 		Topic:             topic,
 		NumPartitions:     1,

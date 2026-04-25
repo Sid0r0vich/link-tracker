@@ -23,8 +23,6 @@ import (
 	state_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/state"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/delivery"
 	"go.uber.org/fx"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 func startServer(cfg *config.Config, deliveryService *delivery.DeliveryService, logger *slog.Logger) {
@@ -41,7 +39,7 @@ func startServer(cfg *config.Config, deliveryService *delivery.DeliveryService, 
 
 func startConsumer(ctx context.Context, cfg *config.Config, deliveryService *delivery.DeliveryService, logger *slog.Logger) error {
 	handler := brokerhandler.NewBotMessageHandler(deliveryService, logger)
-	return broker.StartConsumerGroup(ctx, broker.NewConfig(cfg), logger, cfg.Kafka.Brokers, cfg.Kafka.GroupID, cfg.Kafka.Topic, handler.Handle)
+	return broker.StartConsumerGroup(ctx, broker.NewConfig(), logger, cfg.Kafka.Brokers, cfg.Kafka.GroupID, cfg.Kafka.Topic, handler.Handle)
 }
 
 func run(cfg *config.Config, chatController *chat.ChatController, deliveryService *delivery.DeliveryService, logger *slog.Logger) error {
@@ -94,8 +92,8 @@ func run(cfg *config.Config, chatController *chat.ChatController, deliveryServic
 	return nil
 }
 
-func main() {
-	fx.New(
+func NewApp() *fx.App {
+	return fx.New(
 		//fx.NopLogger,
 		fx.Provide(
 			config.LoadConfig,
@@ -106,20 +104,18 @@ func main() {
 					return scrapper.NewScrapperAdapterImpl(fmt.Sprintf("http://%s", cfg.Scrapper.ServerAddr))
 
 				case config.TransportProtocolGRPC:
-					conn, err := grpc.NewClient("link-tracker-scrapper:1234", grpc.WithTransportCredentials(insecure.NewCredentials()))
+					grpcAdapter, err := scrapper.NewScrapperAdapterRPC("link-tracker-scrapper:1234")
 					if err != nil {
-						return nil, fmt.Errorf("failed to connect to scrapper: %v", err)
+						return nil, fmt.Errorf("failed to create gRPC adapter: %v", err)
 					}
 
 					lifecycle.Append(fx.Hook{
 						OnStop: func(context.Context) error {
-							conn.Close()
-							logger.Info("grpc connection closed")
-							return nil
+							return grpcAdapter.ConnClose()
 						},
 					})
 
-					return scrapper.NewScrapperAdapterRPC(conn)
+					return grpcAdapter, nil
 				}
 
 				return nil, fmt.Errorf("invalid transport protocol: %s", cfg.Scrapper.TransportProtocol)
@@ -139,5 +135,9 @@ func main() {
 			delivery.NewDeliveryService,
 		),
 		fx.Invoke(run),
-	).Run()
+	)
+}
+
+func main() {
+	NewApp().Run()
 }

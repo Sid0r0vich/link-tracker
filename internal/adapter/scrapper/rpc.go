@@ -10,15 +10,25 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/scrapper/rpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
 type ScrapperAdapterRPC struct {
+	conn   *grpc.ClientConn
 	client rpc.ScrapperAPIClient
 }
 
-func NewScrapperAdapterRPC(conn grpc.ClientConnInterface) (*ScrapperAdapterRPC, error) {
-	return &ScrapperAdapterRPC{client: rpc.NewScrapperAPIClient(conn)}, nil
+func NewScrapperAdapterRPC(target string) (*ScrapperAdapterRPC, error) {
+	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to target %s: %v", target, err)
+	}
+	return &ScrapperAdapterRPC{conn: conn, client: rpc.NewScrapperAPIClient(conn)}, nil
+}
+
+func (s *ScrapperAdapterRPC) ConnClose() error {
+	return s.conn.Close()
 }
 
 func (s *ScrapperAdapterRPC) AddChat(chatID int64) error {

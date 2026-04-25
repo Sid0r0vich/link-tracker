@@ -8,7 +8,7 @@ import (
 	"go.uber.org/thriftrw/ptr"
 )
 
-func CreateTopicIfNotExists(kafkaCfg config.KafkaConfig, cfg *sarama.Config) error {
+func CreateTopicIfNotExists(kafkaCfg *config.KafkaConfig, cfg *sarama.Config) error {
 	admin, err := sarama.NewClusterAdmin(kafkaCfg.Brokers, cfg)
 	if err != nil {
 		return err

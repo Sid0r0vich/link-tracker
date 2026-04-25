@@ -2,10 +2,9 @@ package broker
 
 import (
 	"github.com/IBM/sarama"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 )
 
-func NewConfig(appCfg *config.Config, opts ...func(*sarama.Config)) *sarama.Config {
+func NewConfig(opts ...func(*sarama.Config)) *sarama.Config {
 	cfg := sarama.NewConfig()
 
 	cfg.Version = sarama.V4_0_0_0
