@@ -118,10 +118,17 @@ func HandleMessage(bot API, msg *tgbotapi.Message) error {
 			return err
 		}
 
-		data = domain.ChatSimpleData{State: domain.Wait}
-		err := bot.SetData(msg.Chat.ID, data)
+		err := bot.AddChat(msg.Chat.ID)
 		if err != nil {
 			bot.LogError(err)
+			return err
+		}
+
+		data = domain.ChatSimpleData{State: domain.Wait}
+		err = bot.SetData(msg.Chat.ID, data)
+		if err != nil {
+			bot.LogError(err)
+			return err
 		}
 	}
 
