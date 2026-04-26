@@ -29,7 +29,7 @@ func TestHandleMessage(t *testing.T) {
 		msg := plainMessage("hello")
 		mockAPI := mocks.NewMockAPI(ctrl)
 		expectedErr := errors.New("storage is down")
-		mockAPI.EXPECT().GetData(int64(0)).Return(nil, expectedErr).Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(nil, expectedErr)
 
 		err := bot.HandleMessage(mockAPI, &msg)
 		if !errors.Is(err, expectedErr) {
@@ -43,14 +43,15 @@ func TestHandleMessage(t *testing.T) {
 
 		msg := plainMessage("hello")
 		mockAPI := mocks.NewMockAPI(ctrl)
-		mockAPI.EXPECT().GetData(int64(0)).Return(nil, uerrors.ErrChatNotExists).Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(nil, uerrors.ErrChatNotExists)
+		mockAPI.EXPECT().AddChat(int64(0)).Return(nil)
 		mockAPI.EXPECT().SetData(int64(0), gomock.Any()).DoAndReturn(func(_ int64, data domain.ChatData) error {
 			if data.GetState() != domain.Wait {
 				t.Fatalf("expected wait state, got %v", data.GetState())
 			}
 			return nil
-		}).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Зайдите в меню, чтобы отправить команду").Times(1)
+		})
+		mockAPI.EXPECT().Send(int64(0), "Зайдите в меню, чтобы отправить команду")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -64,13 +65,14 @@ func TestHandleMessage(t *testing.T) {
 		msg := plainMessage("hello")
 		mockAPI := mocks.NewMockAPI(ctrl)
 		setErr := errors.New("set data failed")
-		mockAPI.EXPECT().GetData(int64(0)).Return(nil, uerrors.ErrChatNotExists).Times(1)
-		mockAPI.EXPECT().SetData(int64(0), gomock.Any()).Return(setErr).Times(1)
-		mockAPI.EXPECT().LogError(setErr).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Зайдите в меню, чтобы отправить команду").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(nil, uerrors.ErrChatNotExists)
+		mockAPI.EXPECT().AddChat(int64(0)).Return(nil)
+		mockAPI.EXPECT().SetData(int64(0), gomock.Any()).Return(setErr)
+		mockAPI.EXPECT().LogError(setErr)
 
-		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
-			t.Fatalf("HandleMessage returned unexpected error: %v", err)
+		err := bot.HandleMessage(mockAPI, &msg)
+		if !errors.Is(err, setErr) {
+			t.Fatalf("expected %v, got %v", setErr, err)
 		}
 	})
 
@@ -80,8 +82,8 @@ func TestHandleMessage(t *testing.T) {
 
 		msg := plainMessage("hello")
 		mockAPI := mocks.NewMockAPI(ctrl)
-		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.Wait}, nil).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Зайдите в меню, чтобы отправить команду").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.Wait}, nil)
+		mockAPI.EXPECT().Send(int64(0), "Зайдите в меню, чтобы отправить команду")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -94,8 +96,8 @@ func TestHandleMessage(t *testing.T) {
 
 		msg := plainMessage("hello")
 		mockAPI := mocks.NewMockAPI(ctrl)
-		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.ChatState(99)}, nil).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Ошибка на стороне сервера").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.ChatState(99)}, nil)
+		mockAPI.EXPECT().Send(int64(0), "Ошибка на стороне сервера")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -108,8 +110,8 @@ func TestHandleMessage(t *testing.T) {
 
 		msg := plainMessage("not-a-url")
 		mockAPI := mocks.NewMockAPI(ctrl)
-		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkTrack}, nil).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Некорректная ссылка").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkTrack}, nil)
+		mockAPI.EXPECT().Send(int64(0), "Некорректная ссылка")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -127,9 +129,9 @@ func TestHandleMessage(t *testing.T) {
 
 		msg := plainMessage(ts.URL)
 		mockAPI := mocks.NewMockAPI(ctrl)
-		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkTrack}, nil).Times(1)
-		mockAPI.EXPECT().SetTrackLink(int64(0), ts.URL).Return(nil).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Введите теги:").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkTrack}, nil)
+		mockAPI.EXPECT().SetTrackLink(int64(0), ts.URL).Return(nil)
+		mockAPI.EXPECT().Send(int64(0), "Введите теги:")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -148,10 +150,10 @@ func TestHandleMessage(t *testing.T) {
 		msg := plainMessage(ts.URL)
 		mockAPI := mocks.NewMockAPI(ctrl)
 		setErr := errors.New("set track link failed")
-		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkTrack}, nil).Times(1)
-		mockAPI.EXPECT().SetTrackLink(int64(0), ts.URL).Return(setErr).Times(1)
-		mockAPI.EXPECT().LogError(setErr).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Введите теги:").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkTrack}, nil)
+		mockAPI.EXPECT().SetTrackLink(int64(0), ts.URL).Return(setErr)
+		mockAPI.EXPECT().LogError(setErr)
+		mockAPI.EXPECT().Send(int64(0), "Введите теги:")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -164,9 +166,9 @@ func TestHandleMessage(t *testing.T) {
 
 		msg := plainMessage("go, backend, infra")
 		mockAPI := mocks.NewMockAPI(ctrl)
-		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.TagsTrack}, nil).Times(1)
-		mockAPI.EXPECT().SetTrackTags(int64(0), []string{"go", "backend", "infra"}).Return(nil).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Введите фильтры:").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.TagsTrack}, nil)
+		mockAPI.EXPECT().SetTrackTags(int64(0), []string{"go", "backend", "infra"}).Return(nil)
+		mockAPI.EXPECT().Send(int64(0), "Введите фильтры:")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -180,10 +182,10 @@ func TestHandleMessage(t *testing.T) {
 		msg := plainMessage("go")
 		mockAPI := mocks.NewMockAPI(ctrl)
 		tagErr := errors.New("bad tags")
-		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.TagsTrack}, nil).Times(1)
-		mockAPI.EXPECT().SetTrackTags(int64(0), []string{"go"}).Return(tagErr).Times(1)
-		mockAPI.EXPECT().LogError(tagErr).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Данные введены некорректно").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.TagsTrack}, nil)
+		mockAPI.EXPECT().SetTrackTags(int64(0), []string{"go"}).Return(tagErr)
+		mockAPI.EXPECT().LogError(tagErr)
+		mockAPI.EXPECT().Send(int64(0), "Данные введены некорректно")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -197,9 +199,9 @@ func TestHandleMessage(t *testing.T) {
 		msg := plainMessage("f1, f2")
 		mockAPI := mocks.NewMockAPI(ctrl)
 		filterErr := errors.New("bad filters")
-		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.FilterTrack}, nil).Times(1)
-		mockAPI.EXPECT().SetTrackFilters(int64(0), []string{"f1", "f2"}).Return(filterErr).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Данные введены некорректно").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.FilterTrack}, nil)
+		mockAPI.EXPECT().SetTrackFilters(int64(0), []string{"f1", "f2"}).Return(filterErr)
+		mockAPI.EXPECT().Send(int64(0), "Данные введены некорректно")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -212,10 +214,10 @@ func TestHandleMessage(t *testing.T) {
 
 		msg := plainMessage("f1, f2")
 		mockAPI := mocks.NewMockAPI(ctrl)
-		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.FilterTrack}, nil).Times(1)
-		mockAPI.EXPECT().SetTrackFilters(int64(0), []string{"f1", "f2"}).Return(nil).Times(1)
-		mockAPI.EXPECT().AddLink(int64(0)).Return(nil).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Ссылка успешно добавлена!").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.FilterTrack}, nil)
+		mockAPI.EXPECT().SetTrackFilters(int64(0), []string{"f1", "f2"}).Return(nil)
+		mockAPI.EXPECT().AddLink(int64(0)).Return(nil)
+		mockAPI.EXPECT().Send(int64(0), "Ссылка успешно добавлена!")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -232,7 +234,7 @@ func TestHandleMessage(t *testing.T) {
 			{name: "bad url", err: uerrors.ErrBadURL, ans: "Некорректная ссылка"},
 			{name: "bad token", err: uerrors.ErrBadToken, ans: "Некорректный токен"},
 			{name: "too many requests", err: uerrors.ErrTooManyRequests, ans: "Слишком больше количество запросов"},
-			{name: "external api unavailable", err: uerrors.ErrInternal, ans: "Неизвестная ошибка"},
+			{name: "external api unavailable", err: uerrors.ErrAPIUnavailable, ans: "Сервис не доступен"},
 			{name: "unknown", err: errors.New("boom"), ans: "Неизвестная ошибка"},
 		}
 
@@ -243,11 +245,14 @@ func TestHandleMessage(t *testing.T) {
 
 				msg := plainMessage("f1")
 				mockAPI := mocks.NewMockAPI(ctrl)
-				mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.FilterTrack}, nil).Times(1)
-				mockAPI.EXPECT().SetTrackFilters(int64(0), []string{"f1"}).Return(nil).Times(1)
-				mockAPI.EXPECT().AddLink(int64(0)).Return(tc.err).Times(1)
-				mockAPI.EXPECT().LogError(tc.err).Times(1)
-				mockAPI.EXPECT().Send(int64(0), tc.ans).Times(1)
+				mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.FilterTrack}, nil)
+				mockAPI.EXPECT().SetTrackFilters(int64(0), []string{"f1"}).Return(nil)
+				mockAPI.EXPECT().AddLink(int64(0)).Return(tc.err)
+				mockAPI.EXPECT().LogError(gomock.Any())
+				if errors.Is(tc.err, uerrors.ErrAPIUnavailable) {
+					mockAPI.EXPECT().LogError(tc.err)
+				}
+				mockAPI.EXPECT().Send(int64(0), tc.ans)
 
 				if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 					t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -262,10 +267,10 @@ func TestHandleMessage(t *testing.T) {
 
 		msg := plainMessage("https://example.com")
 		mockAPI := mocks.NewMockAPI(ctrl)
-		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkUntrack}, nil).Times(1)
-		mockAPI.EXPECT().SetUntrackLink(int64(0), "https://example.com").Return(nil).Times(1)
-		mockAPI.EXPECT().DeleteLink(int64(0)).Return(nil).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Ссылка больше не отслеживается").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkUntrack}, nil)
+		mockAPI.EXPECT().SetUntrackLink(int64(0), "https://example.com").Return(nil)
+		mockAPI.EXPECT().DeleteLink(int64(0)).Return(nil)
+		mockAPI.EXPECT().Send(int64(0), "Ссылка больше не отслеживается")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -279,11 +284,11 @@ func TestHandleMessage(t *testing.T) {
 		msg := plainMessage("https://example.com")
 		mockAPI := mocks.NewMockAPI(ctrl)
 		setErr := errors.New("set untrack failed")
-		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkUntrack}, nil).Times(1)
-		mockAPI.EXPECT().SetUntrackLink(int64(0), "https://example.com").Return(setErr).Times(1)
-		mockAPI.EXPECT().LogError(setErr).Times(1)
-		mockAPI.EXPECT().DeleteLink(int64(0)).Return(nil).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Ссылка больше не отслеживается").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkUntrack}, nil)
+		mockAPI.EXPECT().SetUntrackLink(int64(0), "https://example.com").Return(setErr)
+		mockAPI.EXPECT().LogError(setErr)
+		mockAPI.EXPECT().DeleteLink(int64(0)).Return(nil)
+		mockAPI.EXPECT().Send(int64(0), "Ссылка больше не отслеживается")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -296,10 +301,10 @@ func TestHandleMessage(t *testing.T) {
 
 		msg := plainMessage("https://example.com")
 		mockAPI := mocks.NewMockAPI(ctrl)
-		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkUntrack}, nil).Times(1)
-		mockAPI.EXPECT().SetUntrackLink(int64(0), "https://example.com").Return(nil).Times(1)
-		mockAPI.EXPECT().DeleteLink(int64(0)).Return(uerrors.ErrChatNotExistsOrLinkNotFound).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Ссылка не найдена").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkUntrack}, nil)
+		mockAPI.EXPECT().SetUntrackLink(int64(0), "https://example.com").Return(nil)
+		mockAPI.EXPECT().DeleteLink(int64(0)).Return(uerrors.ErrChatNotExistsOrLinkNotFound)
+		mockAPI.EXPECT().Send(int64(0), "Ссылка не найдена")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)
@@ -313,11 +318,11 @@ func TestHandleMessage(t *testing.T) {
 		msg := plainMessage("https://example.com")
 		mockAPI := mocks.NewMockAPI(ctrl)
 		delErr := errors.New("delete failed")
-		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkUntrack}, nil).Times(1)
-		mockAPI.EXPECT().SetUntrackLink(int64(0), "https://example.com").Return(nil).Times(1)
-		mockAPI.EXPECT().DeleteLink(int64(0)).Return(delErr).Times(1)
-		mockAPI.EXPECT().LogError(delErr).Times(1)
-		mockAPI.EXPECT().Send(int64(0), "Ошибка на стороне сервера").Times(1)
+		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkUntrack}, nil)
+		mockAPI.EXPECT().SetUntrackLink(int64(0), "https://example.com").Return(nil)
+		mockAPI.EXPECT().DeleteLink(int64(0)).Return(delErr)
+		mockAPI.EXPECT().LogError(delErr)
+		mockAPI.EXPECT().Send(int64(0), "Ошибка на стороне сервера")
 
 		if err := bot.HandleMessage(mockAPI, &msg); err != nil {
 			t.Fatalf("HandleMessage returned unexpected error: %v", err)

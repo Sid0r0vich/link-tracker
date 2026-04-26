@@ -3,14 +3,13 @@ package scrapper
 import (
 	"io"
 	"log/slog"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/scrapper/mocks"
 	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
 
@@ -22,28 +21,7 @@ func TestGithubScrapper_GetUpdate_NewIssueFormatsEvent(t *testing.T) {
 	url := "/acme/project"
 	serverUrl := "/repos" + url
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case serverUrl:
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"description":"test repo"}`))
-		case serverUrl + "/pulls":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`[]`))
-		case serverUrl + "/issues":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`[
-				{
-					"created_at":"` + createdAt.Format(time.RFC3339) + `",
-					"title":"title",
-					"body":"` + body + `",
-					"user":{"login":"name"}
-				}
-			]`))
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
+	ts := mocks.NewMockGithubAPI(t, serverUrl, createdAt, body)
 	defer ts.Close()
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))

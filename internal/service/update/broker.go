@@ -22,7 +22,9 @@ func NewUpdateBrokerService(
 	logger *slog.Logger,
 ) (*UpdateBrokerService, error) {
 	saramaCfg := broker.NewConfig()
-	broker.CreateTopicIfNotExists(cfg, saramaCfg)
+	if err := broker.CreateTopicIfNotExists(cfg, saramaCfg); err != nil {
+		return nil, fmt.Errorf("create kafka topic %q: %w", cfg.Topic, err)
+	}
 	producer, err := broker.NewProducer(ctx, saramaCfg, logger, cfg.Brokers)
 	if err != nil {
 		return nil, fmt.Errorf("create update producer: %w", err)

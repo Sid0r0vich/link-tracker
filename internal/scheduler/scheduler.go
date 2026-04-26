@@ -102,7 +102,6 @@ func (s *Scheduler) CheckUpdates() error {
 		if err != nil {
 			s.LogError(fmt.Errorf("get link batch: %w", err))
 		}
-		s.logger.Info("get link batch", "links", links)
 
 		if len(links) == 0 {
 			break

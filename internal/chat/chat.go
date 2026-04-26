@@ -1,33 +1,38 @@
 package chat
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"slices"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/adapter/scrapper"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	state_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/state"
 )
 
+//go:generate go run go.uber.org/mock/mockgen -source=chat.go -destination=mocks/mock.gen.go -package=mocks
+
+type BotApi interface {
+	Request(tgbotapi.Chattable) (*tgbotapi.APIResponse, error)
+	Send(tgbotapi.Chattable) (tgbotapi.Message, error)
+	GetUpdatesChan(tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel
+}
+
 type ChatController struct {
-	api             *tgbotapi.BotAPI
+	api             BotApi
 	stateRepo       state_repository.StateRepository
 	logger          *slog.Logger
 	scrapperAdapter scrapper.ScrapperAdapter
 }
 
-func NewChatController(token string, scrapperAdapter scrapper.ScrapperAdapter, stateRepo state_repository.StateRepository, logger *slog.Logger) (*ChatController, error) {
+func NewChatController(botApi BotApi, scrapperAdapter scrapper.ScrapperAdapter, stateRepo state_repository.StateRepository, logger *slog.Logger) (*ChatController, error) {
 	logger.Info("init chat controller")
 
-	api, err := tgbotapi.NewBotAPI(token)
-	if err != nil {
-		logger.Error("failed to create bot", "error", err)
-		return nil, err
-	}
-	return &ChatController{api: api, stateRepo: stateRepo, logger: logger, scrapperAdapter: scrapperAdapter}, nil
+	return &ChatController{api: botApi, stateRepo: stateRepo, logger: logger, scrapperAdapter: scrapperAdapter}, nil
 }
 
 func (b *ChatController) SetCommands(commands []tgbotapi.BotCommand) error {
@@ -36,10 +41,31 @@ func (b *ChatController) SetCommands(commands []tgbotapi.BotCommand) error {
 	return err
 }
 
-func (b *ChatController) GetUpdatesChan() tgbotapi.UpdatesChannel {
+func (b *ChatController) HandleUpdates(ctx context.Context) {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
-	return b.api.GetUpdatesChan(u)
+	updates := b.api.GetUpdatesChan(u)
+
+	for {
+		select {
+		case <-ctx.Done():
+			b.logger.Info("stop handle updates")
+			return
+		case update := <-updates:
+			if update.Message == nil {
+				b.logger.Error("nil message")
+				continue
+			}
+
+			if update.Message.IsCommand() {
+				b.logger.Info("get command", "command", update.Message.Command(), "chat_id", update.Message.Chat.ID)
+				_ = bot.HandleCommand(b, update.Message)
+			} else {
+				b.logger.Info("get message", "message", update.Message.Text, "chat_id", update.Message.Chat.ID)
+				_ = bot.HandleMessage(b, update.Message)
+			}
+		}
+	}
 }
 
 func (b *ChatController) GetData(chatID int64) (domain.ChatData, error) {

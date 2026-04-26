@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"net"
@@ -10,22 +9,19 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/db"
 	rest_handlers "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/rest"
 	rpc_handlers "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/rpc"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/logs"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/middleware"
 	link_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
-	orm_link_repo "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link/postgres/orm"
-	sql_link_repo "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link/postgres/sql"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/scheduler"
 	link_service "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/link"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/scrapper"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/update"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/utils"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/scrapper/rest"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/scrapper/rpc"
 	"go.uber.org/fx"
@@ -78,64 +74,10 @@ func run(
 	return nil
 }
 
-func NewSQLRepo(
-	cfg *config.DatabaseConfig,
-	lifecycle fx.Lifecycle,
-	logger *slog.Logger,
-) (link_repository.LinkUnitedRepository, func() error, error) {
-	pgxCfg, err := db.GetConnCfg(cfg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("get pgx pool config: %w", err)
-	}
-
-	pool, err := db.GetDBPoolConn(pgxCfg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("connect to db: %w", err)
-	}
-
-	return sql_link_repo.NewSqlLinkService(pool, cfg.SubscriptionBatchSize), func() error {
-		db.CloseDBConn()
-		return nil
-	}, nil
-}
-
-func NewORMRepo(
-	cfg *config.DatabaseConfig,
-	lifecycle fx.Lifecycle,
-	logger *slog.Logger,
-) (link_repository.LinkUnitedRepository, func() error, error) {
-	db, err := sql.Open("pgx", db.GetDSNFromConfig(cfg))
-	if err != nil {
-		return nil, nil, fmt.Errorf("fail to open database: %v", err)
-	}
-
-	return orm_link_repo.NewORMLinkService(db, cfg.SubscriptionBatchSize), db.Close, nil
-}
-
-func getContext(lifecycle fx.Lifecycle) context.Context {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	lifecycle.Append(fx.Hook{
-		OnStop: func(context.Context) error {
-			cancel()
-			return nil
-		},
-	})
-
-	return ctx
-}
-
-func NewScrapper(cfg *config.Config, logger *slog.Logger) scrapper.Scrapper {
-	return scrapper.NewScrapperService(map[string]scrapper.Scrapper{
-		"github.com":        scrapper.NewGithubScrapper(cfg.Scrapper.GithubToken, logger),
-		"stackoverflow.com": scrapper.NewStackoverflowScrapper(cfg.Scrapper.StackoverflowKey),
-	})
-}
-
 func NewApp() *fx.App {
 	return fx.New(
 		fx.Provide(
-			getContext,
+			utils.GetContext,
 			config.LoadConfig,
 			logs.NewLogger,
 			fx.Annotate(
@@ -149,12 +91,12 @@ func NewApp() *fx.App {
 					var err error
 					switch cfg.Scrapper.DBAccessType {
 					case "SQL":
-						repo, close, err = NewSQLRepo(&cfg.Database, lifecycle, logger)
+						repo, close, err = link_repository.NewSQLRepo(&cfg.Database, logger)
 						if err != nil {
 							return nil, fmt.Errorf("failed to create SQL repo: %w", err)
 						}
 					case "ORM":
-						repo, close, err = NewORMRepo(&cfg.Database, lifecycle, logger)
+						repo, close, err = link_repository.NewORMRepo(&cfg.Database, logger)
 						if err != nil {
 							return nil, fmt.Errorf("failed to create ORM repo: %w", err)
 						}
@@ -194,7 +136,7 @@ func NewApp() *fx.App {
 			),
 			rest_handlers.NewScrapperRestServer,
 			rpc_handlers.NewScrapperRPCServer,
-			NewScrapper,
+			scrapper.NewScrapper,
 			func(
 				cfg *config.Config,
 				linkRepo link_repository.LinkUpdateRepository,
@@ -202,7 +144,7 @@ func NewApp() *fx.App {
 				updater scheduler.Updater,
 				scrapper scrapper.Scrapper,
 			) (*scheduler.Scheduler, error) {
-				return scheduler.NewScheduler(linkRepo, logger, updater, scrapper, time.Duration(cfg.Scrapper.JobDelayIntervalSeconds)*time.Second)
+				return scheduler.NewScheduler(linkRepo, logger, updater, scrapper, cfg.Scrapper.JobDelayInterval)
 			},
 		),
 		fx.Invoke(run),

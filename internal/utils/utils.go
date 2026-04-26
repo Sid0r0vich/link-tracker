@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"go.uber.org/fx"
 )
 
-func CheckLink(url string) error {
+func CheckUrl(url string) error {
 	req, err := http.NewRequest("Get", url, nil)
 	if err != nil {
 		return fmt.Errorf("making request to bot: %w", err)
@@ -46,4 +48,17 @@ func IsNetError(err error) bool {
 	}
 
 	return false
+}
+
+func GetContext(lifecycle fx.Lifecycle) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	lifecycle.Append(fx.Hook{
+		OnStop: func(context.Context) error {
+			cancel()
+			return nil
+		},
+	})
+
+	return ctx
 }

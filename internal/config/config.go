@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -65,7 +66,7 @@ type Config struct {
 
 type DatabaseConfig struct {
 	Host                  string `mapstructure:"host"`
-	Port                  int    `mapstructure:"port"`
+	Port                  uint16 `mapstructure:"port"`
 	Username              string `mapstructure:"username"`
 	Password              string `mapstructure:"password"`
 	Name                  string `mapstructure:"name"`
@@ -87,7 +88,7 @@ type ScrapperConfig struct {
 	StackoverflowKey        string                  `mapstructure:"stackoverflow_key"`
 	DBAccessType            DBAccessType            `mapstructure:"db_access_type"`
 	TransportProtocol       TransportProtocol       `mapstructure:"transport_protocol"`
-	JobDelayIntervalSeconds int                     `mapstructure:"job_delay_interval_seconds"`
+	JobDelayInterval        time.Duration           `mapstructure:"job_delay_interval"`
 	UpdateCommunicationType UpdateCommunicationType `mapstructure:"update_communication_type"`
 }
 

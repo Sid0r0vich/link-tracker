@@ -64,7 +64,7 @@ func (s *KafkaTestSuite) TestCreateTopicIfNotExists_Idempotent() {
 		RetentionMs:       60000,
 		MinInsyncReplicas: 1,
 	}
-	clientCfg := broker.NewConfig(nil)
+	clientCfg := broker.NewConfig()
 
 	require.NoError(s.T(), broker.CreateTopicIfNotExists(kafkaCfg, clientCfg))
 	require.NoError(s.T(), broker.CreateTopicIfNotExists(kafkaCfg, clientCfg))
@@ -94,9 +94,8 @@ func (s *KafkaTestSuite) TestStartConsumerGroup_ConsumesMessage() {
 		RetentionMs:       60000,
 		MinInsyncReplicas: 1,
 	}
-	clientCfg := broker.NewConfig(nil, func(cfg *sarama.Config) {
-		cfg.Consumer.Offsets.Initial = sarama.OffsetOldest
-	})
+	clientCfg := broker.NewConfig()
+	clientCfg.Consumer.Offsets.Initial = sarama.OffsetOldest
 	require.NoError(s.T(), broker.CreateTopicIfNotExists(kafkaCfg, clientCfg))
 
 	consumerCtx, cancelConsumer := context.WithCancel(context.Background())
@@ -111,9 +110,11 @@ func (s *KafkaTestSuite) TestStartConsumerGroup_ConsumesMessage() {
 			consumerCtx,
 			clientCfg,
 			logger,
-			s.brokers,
-			groupID,
-			topic,
+			&config.KafkaConfig{
+				Brokers: s.brokers,
+				GroupID: groupID,
+				Topic:   topic,
+			},
 			func(message *sarama.ConsumerMessage) {
 				select {
 				case received <- message:

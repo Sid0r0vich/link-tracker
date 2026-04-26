@@ -17,16 +17,16 @@ import (
 type StackoverflowScrapper struct {
 	Key       string
 	Client    http.Client
-	apiHost   string
-	apiScheme string
+	ApiHost   string
+	ApiScheme string
 }
 
 func NewStackoverflowScrapper(key string) *StackoverflowScrapper {
 	return &StackoverflowScrapper{
 		Key:       key,
 		Client:    http.Client{Timeout: 5 * time.Second},
-		apiHost:   "api.stackexchange.com",
-		apiScheme: "https",
+		ApiHost:   "api.stackexchange.com",
+		ApiScheme: "https",
 	}
 }
 
@@ -91,7 +91,7 @@ func (s *StackoverflowScrapper) GetUpdate(rurl string) (*domain.Update, error) {
 		return nil, fmt.Errorf("get question id: %v, %w", err, uerrors.ErrBadURL)
 	}
 
-	questionUrl := fmt.Sprintf("%s://%s/questions/%s", s.apiScheme, s.apiHost, questionID)
+	questionUrl := fmt.Sprintf("%s://%s/questions/%s", s.ApiScheme, s.ApiHost, questionID)
 	resp, err := s.makeRequest(questionUrl)
 	if err != nil {
 		return nil, err
@@ -177,10 +177,10 @@ func (s *StackoverflowScrapper) getEvents(questionID string, typ string, title s
 	var humanType string
 	switch typ {
 	case "answer":
-		url = fmt.Sprintf("%s://%s/questions/%s/answers", s.apiScheme, s.apiHost, questionID)
+		url = fmt.Sprintf("%s://%s/questions/%s/answers", s.ApiScheme, s.ApiHost, questionID)
 		humanType = "answer"
 	case "comment":
-		url = fmt.Sprintf("%s://%s/questions/%s/comments", s.apiScheme, s.apiHost, questionID)
+		url = fmt.Sprintf("%s://%s/questions/%s/comments", s.ApiScheme, s.ApiHost, questionID)
 		humanType = "comment"
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", typ)

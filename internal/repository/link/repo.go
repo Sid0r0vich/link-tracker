@@ -1,4 +1,4 @@
-package link_repository
+package link
 
 import (
 	"time"

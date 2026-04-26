@@ -24,7 +24,7 @@ func TestBotUpdatesApi_GetUpdate_SendsFormattedMessage(t *testing.T) {
 
 	mockAPI := mocks.NewMockAPI(ctrl)
 	deliveryService := delivery.NewDeliveryService(mockAPI)
-	h := server.NewBotUpdatesApi(deliveryService)
+	h := server.NewBotRestServer(deliveryService)
 
 	chatID := int64(123)
 	createdAt := time.Unix(0, 0).UTC()
@@ -60,7 +60,7 @@ func TestBotUpdatesApi_GetUpdate_SendsFormattedMessage(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/updates", bytes.NewReader(payload))
 	w := httptest.NewRecorder()
 
-	h.GetUpdate(w, r)
+	h.PostUpdates(w, r)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", w.Code)

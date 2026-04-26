@@ -13,11 +13,11 @@ type BotRestServer struct {
 	deliveryService *delivery.DeliveryService
 }
 
-func NewBotUpdatesApi(deliveryService *delivery.DeliveryService) *BotRestServer {
+func NewBotRestServer(deliveryService *delivery.DeliveryService) *BotRestServer {
 	return &BotRestServer{deliveryService: deliveryService}
 }
 
-func (s *BotRestServer) GetUpdate(w http.ResponseWriter, r *http.Request) {
+func (s *BotRestServer) PostUpdates(w http.ResponseWriter, r *http.Request) {
 	var req api.UpdateResponse
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {

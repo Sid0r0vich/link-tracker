@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -40,28 +41,18 @@ func (s *OrmRepoTestSuite) SetupSuite() {
 				WithStartupTimeout(time.Minute),
 		),
 	)
-	if err != nil {
-		panic(fmt.Errorf("failed to create test container: %v", err))
-	}
+	require.NoError(s.T(), err, "failed to start postgres container")
 
 	connStr, err := s.tc.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		panic(fmt.Errorf("failed to get connection string: %v", err))
-	}
+	require.NoError(s.T(), err, "failed to get connection string")
 
 	s.db, err = sql.Open("pgx", connStr)
-	if err != nil {
-		panic(fmt.Errorf("fail to open database: %v", err))
-	}
+	require.NoError(s.T(), err, "failed to create DB connection")
 
 	migrateCfg, err := pgx.ParseConfig(connStr)
-	if err != nil {
-		panic(fmt.Errorf("failed to parse connection string for migrations: %v", err))
-	}
+	require.NoError(s.T(), err, "failed to parse connection string for migrations")
 
-	if err = db.Migrate(migrateCfg); err != nil {
-		panic(fmt.Errorf("failed to execute migrations: %v", err))
-	}
+	require.NoError(s.T(), db.Migrate(migrateCfg), "failed to execute migrations")
 
 	s.ormRepo = orm_link_repo.NewORMLinkService(s.db, SubscriptionBatchSize)
 }

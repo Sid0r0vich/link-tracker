@@ -1,15 +1,13 @@
 package scrapper
 
 import (
-	"net/http"
-	"net/http/httptest"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/scrapper/mocks"
 	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
 
@@ -21,39 +19,12 @@ func TestStackoverflowScrapper_GetUpdate_NewAnswerFormatsEvent(t *testing.T) {
 	body := strings.Repeat("b", maxDescriptionLength+10)
 	url := "/questions/1"
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case url:
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{
-				"items":[
-					{"last_activity_date":` + int64ToString(lastActivity) + `,"title":"title"}
-				]
-			}`))
-		case url + "/answers":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{
-				"items":[
-					{
-						"last_activity_date":` + int64ToString(lastActivity) + `,
-						"creation_date":` + int64ToString(creationDate) + `,
-						"owner":{"display_name":"name"},
-						"body":"` + body + `"
-					}
-				]
-			}`))
-		case url + "/comments":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"items":[]}`))
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
+	ts := mocks.NewMockStackoverflowAPI(t, url, creationDate, lastActivity, body)
 	defer ts.Close()
 
 	s := NewStackoverflowScrapper("test-key")
-	s.apiScheme = "http"
-	s.apiHost = ts.Listener.Addr().String()
+	s.ApiScheme = "http"
+	s.ApiHost = ts.Listener.Addr().String()
 	s.Client = *ts.Client()
 
 	updateUrl := "https://stackoverflow.com" + url
@@ -73,8 +44,4 @@ func TestStackoverflowScrapper_GetUpdate_NewAnswerFormatsEvent(t *testing.T) {
 	}
 
 	assert.Equal(t, *domain.ApiEventToEvent(&expectedEvent), event)
-}
-
-func int64ToString(v int64) string {
-	return strconv.FormatInt(v, 10)
 }

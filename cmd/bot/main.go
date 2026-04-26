@@ -5,12 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/gorilla/mux"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/adapter/scrapper"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/broker"
@@ -22,16 +18,17 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/middleware"
 	state_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/state"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/delivery"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/utils"
+	restBot "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 	"go.uber.org/fx"
 )
 
 func startServer(cfg *config.Config, deliveryService *delivery.DeliveryService, logger *slog.Logger) {
-	api := handlers.NewBotUpdatesApi(deliveryService)
+	api := handlers.NewBotRestServer(deliveryService)
 
-	r := mux.NewRouter()
-	r.HandleFunc("/updates", api.GetUpdate).Methods("POST")
+	handler := restBot.HandlerWithOptions(api, restBot.StdHTTPServerOptions{})
 
-	err := http.ListenAndServe(cfg.Bot.ServerAddr, middleware.LoggingMiddleware(r, logger))
+	err := http.ListenAndServe(cfg.Bot.ServerAddr, middleware.LoggingMiddleware(handler, logger))
 	if err != nil {
 		logger.Error("fail to start server", "error", err)
 	}
@@ -39,10 +36,10 @@ func startServer(cfg *config.Config, deliveryService *delivery.DeliveryService, 
 
 func startConsumer(ctx context.Context, cfg *config.Config, deliveryService *delivery.DeliveryService, logger *slog.Logger) error {
 	handler := brokerhandler.NewBotMessageHandler(deliveryService, logger)
-	return broker.StartConsumerGroup(ctx, broker.NewConfig(), logger, cfg.Kafka.Brokers, cfg.Kafka.GroupID, cfg.Kafka.Topic, handler.Handle)
+	return broker.StartConsumerGroup(ctx, broker.NewConfig(), logger, &cfg.Kafka, handler.Handle)
 }
 
-func run(cfg *config.Config, chatController *chat.ChatController, deliveryService *delivery.DeliveryService, logger *slog.Logger) error {
+func run(ctx context.Context, cfg *config.Config, chatController *chat.ChatController, deliveryService *delivery.DeliveryService, logger *slog.Logger) error {
 	botCommands := make([]tgbotapi.BotCommand, 0, len(bot.CmdToHandler))
 	for name, command := range bot.CmdToHandler {
 		botCommands = append(botCommands, tgbotapi.BotCommand{Command: name, Description: command.Desc})
@@ -59,43 +56,20 @@ func run(cfg *config.Config, chatController *chat.ChatController, deliveryServic
 			startServer(cfg, deliveryService, logger)
 
 		case config.UpdateCommunicationTypeKafka:
-			ctx, cancel := context.WithCancel(context.Background())
-
-			sigterm := make(chan os.Signal, 1)
-			signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
-			go func() {
-				<-sigterm
-				cancel()
-			}()
-
 			startConsumer(ctx, cfg, deliveryService, logger)
 		}
 	}()
 
-	updates := chatController.GetUpdatesChan()
-	logger.Info("get updates")
-	for update := range updates {
-		if update.Message == nil {
-			chatController.LogError(fmt.Errorf("nil message"))
-			continue
-		}
-
-		if update.Message.IsCommand() {
-			logger.Info("get command", "command", update.Message.Command(), "chat_id", update.Message.Chat.ID)
-			_ = bot.HandleCommand(chatController, update.Message)
-		} else {
-			logger.Info("get message", "message", update.Message.Text, "chat_id", update.Message.Chat.ID)
-			_ = bot.HandleMessage(chatController, update.Message)
-		}
-	}
+	logger.Info("handle updates")
+	chatController.HandleUpdates(ctx)
 
 	return nil
 }
 
 func NewApp() *fx.App {
 	return fx.New(
-		//fx.NopLogger,
 		fx.Provide(
+			utils.GetContext,
 			config.LoadConfig,
 			logs.NewLogger,
 			func(cfg *config.Config, lifecycle fx.Lifecycle, logger *slog.Logger) (scrapper.ScrapperAdapter, error) {
@@ -127,7 +101,12 @@ func NewApp() *fx.App {
 				stateRepo *state_repository.InMemoryStateRepo,
 				logger *slog.Logger,
 			) (*chat.ChatController, error) {
-				return chat.NewChatController(cfg.Bot.Token, scrapperAdapter, stateRepo, logger)
+				api, err := tgbotapi.NewBotAPI(cfg.Bot.Token)
+				if err != nil {
+					logger.Error("failed to create bot", "error", err)
+					return nil, err
+				}
+				return chat.NewChatController(api, scrapperAdapter, stateRepo, logger)
 			},
 			func(b *chat.ChatController) bot.API {
 				return b

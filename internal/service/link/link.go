@@ -3,11 +3,15 @@ package link
 //go:generate go run go.uber.org/mock/mockgen -source=../scrapper/scrapper.go -destination=mocks/mock_scrapper.go -package=mocks
 
 import (
+	"fmt"
+	"os"
 	"time"
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
+	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/scrapper"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/utils"
 )
 
 type LinkService interface {
@@ -21,12 +25,14 @@ type LinkService interface {
 type LinkServiceImpl struct {
 	linkRepo repository.LinkRepository
 	scrapper scrapper.Scrapper
+	CheckUrl func(string) error
 }
 
 func NewLinkService(repo repository.LinkRepository, scrapper scrapper.Scrapper) *LinkServiceImpl {
 	return &LinkServiceImpl{
 		linkRepo: repo,
 		scrapper: scrapper,
+		CheckUrl: utils.CheckUrl,
 	}
 }
 
@@ -43,6 +49,11 @@ func (s *LinkServiceImpl) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 }
 
 func (s *LinkServiceImpl) AddLink(chatID int64, link domain.Link) (int64, error) {
+	if err := s.CheckUrl(link.URL); err != nil {
+		fmt.Fprint(os.Stderr, "BAD URL!")
+		return 0, uerrors.ErrBadURL
+	}
+
 	update, err := s.scrapper.GetUpdate(link.URL)
 	if err != nil {
 		return 0, err

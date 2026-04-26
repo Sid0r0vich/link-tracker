@@ -22,6 +22,7 @@ func TestLinkService_AddChat(t *testing.T) {
 	repo := repoMock.NewMockLinkRepository(ctrl)
 	scr := scrapperMock.NewMockScrapper(ctrl)
 	service := NewLinkService(repo, scr)
+	service.CheckUrl = func(string) error { return nil }
 	сhatID := int64(42)
 
 	repo.EXPECT().AddChat(сhatID).Return(nil)
@@ -38,6 +39,7 @@ func TestLinkService_DeleteChat(t *testing.T) {
 	repo := repoMock.NewMockLinkRepository(ctrl)
 	scr := scrapperMock.NewMockScrapper(ctrl)
 	service := NewLinkService(repo, scr)
+	service.CheckUrl = func(string) error { return nil }
 	chatID := int64(12)
 
 	repo.EXPECT().AddChat(chatID).Return(nil)
@@ -75,6 +77,7 @@ func TestLinkService_AddLink_ForwardError(t *testing.T) {
 	repo := repoMock.NewMockLinkRepository(ctrl)
 	scr := scrapperMock.NewMockScrapper(ctrl)
 	service := NewLinkService(repo, scr)
+	service.CheckUrl = func(string) error { return nil }
 
 	input := domain.Link{URL: "https://bad.example.com"}
 	scr.EXPECT().GetUpdate(input.URL).Return(nil, uerrors.ErrBadURL)
@@ -94,6 +97,7 @@ func TestLinkService_AddLink_SetsZeroUpdatedAtBeforeRepository(t *testing.T) {
 	repo := repoMock.NewMockLinkRepository(ctrl)
 	scr := scrapperMock.NewMockScrapper(ctrl)
 	service := NewLinkService(repo, scr)
+	service.CheckUrl = func(string) error { return nil }
 
 	chatID := int64(5)
 	linkID := int64(99)

@@ -2,6 +2,7 @@ package bot
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -33,7 +34,7 @@ var StateToHandler = map[domain.ChatState]MessageHandler{
 		bot.Send(msg.Chat.ID, "Зайдите в меню, чтобы отправить команду")
 	}},
 	domain.LinkTrack: {Fun: func(bot API, msg *tgbotapi.Message) {
-		err := utils.CheckLink(msg.Text)
+		err := utils.CheckUrl(msg.Text)
 		if err != nil {
 			bot.Send(msg.Chat.ID, "Некорректная ссылка")
 			return
@@ -66,7 +67,7 @@ var StateToHandler = map[domain.ChatState]MessageHandler{
 		ans := "Ссылка успешно добавлена!"
 		err = bot.AddLink(msg.Chat.ID)
 		if err != nil {
-			bot.LogError(err)
+			bot.LogError(fmt.Errorf("add link: %v", err))
 			switch {
 			case errors.Is(err, uerrors.ErrLinkAlreadyExists):
 				ans = "Ссылка уже отслеживается"
@@ -120,6 +121,7 @@ func HandleMessage(bot API, msg *tgbotapi.Message) error {
 
 		err := bot.AddChat(msg.Chat.ID)
 		if err != nil {
+			bot.LogError(err)
 			return err
 		}
 
