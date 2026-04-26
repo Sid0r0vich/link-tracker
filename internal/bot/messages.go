@@ -120,7 +120,6 @@ func HandleMessage(bot API, msg *tgbotapi.Message) error {
 
 		err := bot.AddChat(msg.Chat.ID)
 		if err != nil {
-			bot.LogError(err)
 			return err
 		}
 
