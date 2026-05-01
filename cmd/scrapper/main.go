@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/cache"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	rest_handlers "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/rest"
 	rpc_handlers "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/rpc"
@@ -133,6 +134,17 @@ func NewApp() *fx.App {
 			fx.Annotate(
 				link_service.NewLinkService,
 				fx.As(new(link_service.LinkService)),
+			),
+			fx.Annotate(
+				func(cfg *config.Config, logger *slog.Logger) cache.Cache {
+					if cfg.ValKey.Addr == "" {
+						logger.Info("cache disabled; using no-cache")
+						return cache.NewNoCache()
+					}
+
+					return cache.NewValKeyCache(&cfg.ValKey)
+				},
+				fx.As(new(cache.Cache)),
 			),
 			rest_handlers.NewScrapperRestServer,
 			rpc_handlers.NewScrapperRPCServer,

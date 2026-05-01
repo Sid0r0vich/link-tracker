@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/cache"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers"
@@ -64,6 +65,7 @@ func writeJSONError(w http.ResponseWriter, err error) {
 }
 
 func writeJSONErrorWithCode(w http.ResponseWriter, code int, error_code string, description string, msg string) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 
 	resp := rest.ApiErrorResponse{
@@ -71,25 +73,30 @@ func writeJSONErrorWithCode(w http.ResponseWriter, code int, error_code string, 
 		Code:             &error_code,
 		ExceptionMessage: &msg,
 	}
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 type ScrapperRestServer struct {
 	Logger      *slog.Logger
 	LinkService link_service.LinkService
+	Cache       cache.Cache
 }
 
 func NewScrapperRestServer(
 	linkService link_service.LinkService,
 	logger *slog.Logger,
+	cache cache.Cache,
 ) *ScrapperRestServer {
 	return &ScrapperRestServer{
 		Logger:      logger,
 		LinkService: linkService,
+		Cache:       cache,
 	}
 }
 
 func (s *ScrapperRestServer) DeleteLinks(w http.ResponseWriter, r *http.Request, params api.DeleteLinksParams) {
+	w.Header().Set("Content-Type", "application/json")
+
 	type Request struct {
 		Link string `json:"link"`
 	}
@@ -115,12 +122,45 @@ func (s *ScrapperRestServer) DeleteLinks(w http.ResponseWriter, r *http.Request,
 		Filters: &link.Filters,
 	}
 
-	w.Header().Set("Content-Type", "json")
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		writeJSONError(w, err)
+		return
+	}
+
+	err = s.Cache.Delete(params.TgChatId)
+	if err != nil {
+		s.Logger.Error(err.Error())
+	}
+
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
+	_, err = w.Write(respBytes)
+	if err != nil {
+		s.Logger.Error(err.Error())
+	}
 }
 
 func (s *ScrapperRestServer) GetLinks(w http.ResponseWriter, r *http.Request, params api.GetLinksParams) {
+	w.Header().Set("Content-Type", "application/json")
+
+	cachedResp, err := s.Cache.Get(params.TgChatId)
+	if err == nil {
+		s.Logger.Debug("get links: cache hit, resp", "resp", string(cachedResp))
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write(cachedResp)
+		if err != nil {
+			s.Logger.Error(err.Error())
+		}
+		return
+	}
+
+	if !errors.Is(err, cache.ErrCacheMiss) {
+		s.Logger.Error(err.Error())
+		writeJSONError(w, err)
+		return
+	}
+	s.Logger.Debug("get links: cache miss")
+
 	links, err := s.LinkService.GetLinks(params.TgChatId)
 	if err != nil {
 		s.Logger.Error(err.Error())
@@ -140,12 +180,27 @@ func (s *ScrapperRestServer) GetLinks(w http.ResponseWriter, r *http.Request, pa
 		Size:  &n,
 	}
 
-	w.Header().Set("Content-Type", "json")
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		s.Logger.Error(err.Error())
+		writeJSONError(w, err)
+		return
+	}
+
+	if err := s.Cache.Set(params.TgChatId, respBytes); err != nil {
+		s.Logger.Error(err.Error())
+	}
+
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
+	_, err = w.Write(respBytes)
+	if err != nil {
+		s.Logger.Error(err.Error())
+	}
 }
 
 func (s *ScrapperRestServer) PostLinks(w http.ResponseWriter, r *http.Request, params api.PostLinksParams) {
+	w.Header().Set("Content-Type", "application/json")
+
 	var link domain.Link
 	err := json.NewDecoder(r.Body).Decode(&link)
 	if err != nil {
@@ -167,9 +222,15 @@ func (s *ScrapperRestServer) PostLinks(w http.ResponseWriter, r *http.Request, p
 		Filters: &link.Filters,
 	}
 
-	w.Header().Set("Content-Type", "json")
+	if err := s.Cache.Delete(params.TgChatId); err != nil {
+		s.Logger.Error(err.Error())
+	}
+
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
+	err = json.NewEncoder(w).Encode(resp)
+	if err != nil {
+		s.Logger.Error(err.Error())
+	}
 }
 
 func (s *ScrapperRestServer) DeleteTgChatId(w http.ResponseWriter, r *http.Request, id int64) {
@@ -177,6 +238,10 @@ func (s *ScrapperRestServer) DeleteTgChatId(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		writeJSONError(w, err)
 		return
+	}
+
+	if err := s.Cache.Delete(id); err != nil {
+		s.Logger.Error(err.Error())
 	}
 
 	w.WriteHeader(http.StatusOK)

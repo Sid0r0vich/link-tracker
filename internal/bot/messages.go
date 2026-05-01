@@ -34,13 +34,12 @@ var StateToHandler = map[domain.ChatState]MessageHandler{
 		bot.Send(msg.Chat.ID, "Зайдите в меню, чтобы отправить команду")
 	}},
 	domain.LinkTrack: {Fun: func(bot API, msg *tgbotapi.Message) {
-		err := utils.CheckUrl(msg.Text)
-		if err != nil {
+		if err := utils.CheckUrl(msg.Text); err != nil {
 			bot.Send(msg.Chat.ID, "Некорректная ссылка")
 			return
 		}
 
-		err = bot.SetTrackLink(msg.Chat.ID, msg.Text)
+		err := bot.SetTrackLink(msg.Chat.ID, msg.Text)
 		if err != nil {
 			bot.LogError(err)
 		}

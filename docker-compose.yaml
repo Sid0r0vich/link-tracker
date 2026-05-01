@@ -145,6 +145,18 @@ services:
       retries: 10
       start_period: 10s
 
+  valkey:
+    image: valkey/valkey:9.0.3
+    command: ["valkey-server", "/etc/valkey/valkey.conf"]
+    ports:
+      - "6379:6379"
+    networks:
+      - markdown
+    volumes:
+      - ./valkey.conf:/etc/valkey/valkey.conf
+      - ./users.acl:/etc/valkey/users.acl
+    restart: unless-stopped
+
 networks:
   markdown:
     driver: bridge

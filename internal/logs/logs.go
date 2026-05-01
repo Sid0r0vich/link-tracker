@@ -28,6 +28,7 @@ func NewLogger() *slog.Logger {
 			attr.Value = slog.TimeValue(timestamp.In(location))
 			return attr
 		},
+		Level: slog.LevelDebug,
 	}
 
 	return slog.New(tint.NewHandler(os.Stderr, options))

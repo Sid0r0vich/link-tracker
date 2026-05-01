@@ -18,7 +18,7 @@ scrapper:
   server_addr: link-tracker-scrapper:1234
   db_access_type: SQL
   transport_protocol: HTTP
-  job_delay_interval_seconds: 30
+  job_delay_interval: 30s
   update_communication_type: kafka
 
 kafka:
@@ -31,3 +31,7 @@ kafka:
   num_partitions: 1
   retention_ms: 86400000
   min_insync_replicas: 2
+
+valkey:
+  addr: valkey:6379
+  expiration_time: 15m

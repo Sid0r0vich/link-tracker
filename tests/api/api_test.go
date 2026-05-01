@@ -19,6 +19,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	scrapperAdapter "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/adapter/scrapper"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/broker"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/cache"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/chat"
 	chatMocks "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/chat/mocks"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
@@ -242,7 +243,7 @@ func (s *ApiTestSuite) TestApiAddLink() {
 
 	linkService := link.NewLinkService(sqlRepo, scrapperService)
 	linkService.CheckUrl = func(url string) error { return nil }
-	scrapperServer := restHandlers.NewScrapperRestServer(linkService, logger)
+	scrapperServer := restHandlers.NewScrapperRestServer(linkService, logger, cache.NewNoCache())
 	scrapperHandler := restScrapper.HandlerWithOptions(scrapperServer, restScrapper.StdHTTPServerOptions{})
 	scrapperTestServer := httptest.NewServer(middleware.LoggingMiddleware(scrapperHandler, logger))
 	defer scrapperTestServer.Close()

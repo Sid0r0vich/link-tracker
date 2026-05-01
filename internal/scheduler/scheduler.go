@@ -124,6 +124,7 @@ func (s *Scheduler) Start() error {
 	_, err := s.sched.NewJob(
 		gocron.DurationJob(s.jobDelayInterval),
 		gocron.NewTask(s.CheckUpdates),
+		gocron.WithSingletonMode(gocron.LimitModeReschedule),
 	)
 	if err != nil {
 		return err

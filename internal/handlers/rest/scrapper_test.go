@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/cache"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	basehandlers "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers"
@@ -59,14 +60,14 @@ func TestScrapperRestServer_GetLinks_Success(t *testing.T) {
 	service := linkmocks.NewMockLinkRepository(ctrl)
 	service.EXPECT().GetLinks(chatID).Return(expected, nil)
 
-	server := server.NewScrapperRestServer(service, testLogger())
+	server := server.NewScrapperRestServer(service, testLogger(), cache.NewNoCache())
 	request := httptest.NewRequest(http.MethodGet, "/links", nil)
 	response := httptest.NewRecorder()
 
 	server.GetLinks(response, request, api.GetLinksParams{TgChatId: chatID})
 
 	require.Equal(t, http.StatusOK, response.Code)
-	assert.Equal(t, "json", response.Header().Get("Content-Type"))
+	assert.Equal(t, "application/json", response.Header().Get("Content-Type"))
 
 	var got api.ListLinksResponse
 	decodeJSON(t, response, &got)
@@ -86,7 +87,7 @@ func TestScrapperRestServer_GetLinks_Error(t *testing.T) {
 	service := linkmocks.NewMockLinkRepository(ctrl)
 	service.EXPECT().GetLinks(int64(77)).Return(nil, uerrors.ErrChatNotExists)
 
-	server := server.NewScrapperRestServer(service, testLogger())
+	server := server.NewScrapperRestServer(service, testLogger(), cache.NewNoCache())
 	request := httptest.NewRequest(http.MethodGet, "/links", nil)
 	response := httptest.NewRecorder()
 
@@ -111,7 +112,7 @@ func TestScrapperRestServer_ChatHandlers(t *testing.T) {
 	service.EXPECT().AddChat(chatID).Return(nil)
 	service.EXPECT().DeleteChat(chatID).Return(nil)
 
-	server := server.NewScrapperRestServer(service, testLogger())
+	server := server.NewScrapperRestServer(service, testLogger(), cache.NewNoCache())
 
 	postRequest := httptest.NewRequest(http.MethodPost, "/tg-chat", nil)
 	postResponse := httptest.NewRecorder()
@@ -144,7 +145,7 @@ func TestScrapperRestServer_AddLink_Success(t *testing.T) {
 		URL: url,
 	}).Return(linkID, nil)
 
-	server := server.NewScrapperRestServer(service, testLogger())
+	server := server.NewScrapperRestServer(service, testLogger(), cache.NewNoCache())
 	requestBody, err := json.Marshal(domain.Link{
 		LinkInfo: domain.LinkInfo{
 			Tags:    tags,
@@ -160,7 +161,7 @@ func TestScrapperRestServer_AddLink_Success(t *testing.T) {
 	server.PostLinks(response, request, api.PostLinksParams{TgChatId: chatID})
 
 	require.Equal(t, http.StatusOK, response.Code)
-	assert.Equal(t, "json", response.Header().Get("Content-Type"))
+	assert.Equal(t, "application/json", response.Header().Get("Content-Type"))
 
 	var got api.LinkResponse
 	decodeJSON(t, response, &got)
@@ -184,7 +185,7 @@ func TestScrapperRestServer_RemoveLink_Error(t *testing.T) {
 	service := linkmocks.NewMockLinkRepository(ctrl)
 	service.EXPECT().DeleteLink(chatID, url).Return(nil, uerrors.ErrLinkNotFound)
 
-	server := server.NewScrapperRestServer(service, testLogger())
+	server := server.NewScrapperRestServer(service, testLogger(), cache.NewNoCache())
 	body, err := json.Marshal(api.RemoveLinkRequest{Link: &url})
 	require.NoError(t, err)
 
@@ -222,7 +223,7 @@ func TestScrapperRestServer_RemoveLink_Success(t *testing.T) {
 	service := linkmocks.NewMockLinkRepository(ctrl)
 	service.EXPECT().DeleteLink(chatID, expected.URL).Return(expected, nil)
 
-	server := server.NewScrapperRestServer(service, testLogger())
+	server := server.NewScrapperRestServer(service, testLogger(), cache.NewNoCache())
 	body, err := json.Marshal(api.RemoveLinkRequest{Link: &expected.URL})
 	require.NoError(t, err)
 
@@ -232,7 +233,7 @@ func TestScrapperRestServer_RemoveLink_Success(t *testing.T) {
 	server.DeleteLinks(response, request, api.DeleteLinksParams{TgChatId: chatID})
 
 	require.Equal(t, http.StatusOK, response.Code)
-	assert.Equal(t, "json", response.Header().Get("Content-Type"))
+	assert.Equal(t, "application/json", response.Header().Get("Content-Type"))
 
 	var got api.LinkResponse
 	decodeJSON(t, response, &got)

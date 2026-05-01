@@ -62,6 +62,7 @@ type Config struct {
 	Bot      BotConfig      `mapstructure:"bot"`
 	Scrapper ScrapperConfig `mapstructure:"scrapper"`
 	Kafka    KafkaConfig    `mapstructure:"kafka"`
+	ValKey   ValKeyConfig   `mapstructure:"valkey"`
 }
 
 type DatabaseConfig struct {
@@ -101,6 +102,13 @@ type KafkaConfig struct {
 	MinInsyncReplicas int      `mapstructure:"min_insync_replicas"`
 }
 
+type ValKeyConfig struct {
+	Addr           string        `mapstructure:"addr"`
+	User           string        `mapstructure:"user"`
+	Password       string        `mapstructure:"password"`
+	ExpirationTime time.Duration `mapstructure:"expiration_time"`
+}
+
 func LoadConfig(logger *slog.Logger) (*Config, error) {
 	logger.Info("load config")
 
@@ -119,11 +127,14 @@ func newConfigFromFile(name string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigType("yaml")
 	v.SetConfigFile(name)
-	viper.AutomaticEnv()
+	v.AutomaticEnv()
 
 	v.BindEnv("database.username", "POSTGRES_USER")
 	v.BindEnv("database.password", "POSTGRES_PASSWORD")
 	v.BindEnv("database.name", "POSTGRES_DB")
+
+	v.BindEnv("valkey.user", "VALKEY_USER")
+	v.BindEnv("valkey.password", "VALKEY_PASSWORD")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config file: %w", err)
