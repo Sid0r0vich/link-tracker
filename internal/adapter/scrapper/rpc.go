@@ -14,25 +14,25 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type ScrapperAdapterRPC struct {
+type ScrapperRpcAdapter struct {
 	conn   *grpc.ClientConn
 	client rpc.ScrapperAPIClient
 }
 
-func NewScrapperAdapterRPC(target string, opts ...grpc.DialOption) (*ScrapperAdapterRPC, error) {
+func NewScrapperAdapterRPC(target string, opts ...grpc.DialOption) (*ScrapperRpcAdapter, error) {
 	allOpts := append([]grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}, opts...)
 	conn, err := grpc.NewClient(target, allOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to target %s: %v", target, err)
 	}
-	return &ScrapperAdapterRPC{conn: conn, client: rpc.NewScrapperAPIClient(conn)}, nil
+	return &ScrapperRpcAdapter{conn: conn, client: rpc.NewScrapperAPIClient(conn)}, nil
 }
 
-func (s *ScrapperAdapterRPC) ConnClose() error {
+func (s *ScrapperRpcAdapter) ConnClose() error {
 	return s.conn.Close()
 }
 
-func (s *ScrapperAdapterRPC) AddChat(chatID int64) error {
+func (s *ScrapperRpcAdapter) AddChat(chatID int64) error {
 	ctx := context.Background()
 
 	_, err := s.client.RegisterChat(ctx, &rpc.RegisterChatRequest{Id: chatID})
@@ -43,11 +43,11 @@ func (s *ScrapperAdapterRPC) AddChat(chatID int64) error {
 	return nil
 }
 
-func (s *ScrapperAdapterRPC) DeleteChat(chatID int64) error {
+func (s *ScrapperRpcAdapter) DeleteChat(chatID int64) error {
 	return nil
 }
 
-func (s *ScrapperAdapterRPC) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
+func (s *ScrapperRpcAdapter) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 	ctx := context.Background()
 	req := rpc.GetLinksRequest{
 		TgChatId: chatID,
@@ -71,7 +71,7 @@ func (s *ScrapperAdapterRPC) GetLinks(chatID int64) ([]domain.LinkWithID, error)
 	return links, nil
 }
 
-func (s *ScrapperAdapterRPC) AddLink(chatID int64, link domain.Link) error {
+func (s *ScrapperRpcAdapter) AddLink(chatID int64, link domain.Link) error {
 	ctx := context.Background()
 	req := rpc.AddLinkRequest{
 		TgChatId: chatID,
@@ -108,7 +108,7 @@ func (s *ScrapperAdapterRPC) AddLink(chatID int64, link domain.Link) error {
 	return nil
 }
 
-func (s *ScrapperAdapterRPC) DeleteLink(chatID int64, url string) error {
+func (s *ScrapperRpcAdapter) DeleteLink(chatID int64, url string) error {
 	ctx := context.Background()
 	req := rpc.RemoveLinkRequest{
 		TgChatId: chatID,

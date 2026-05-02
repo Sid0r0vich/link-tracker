@@ -4,9 +4,11 @@ package link
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/cache"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
@@ -23,16 +25,25 @@ type LinkService interface {
 }
 
 type LinkServiceImpl struct {
-	linkRepo repository.LinkRepository
-	scrapper scrapper.Scrapper
-	CheckUrl func(string) error
+	linkRepo               repository.LinkRepository
+	scrapper               scrapper.Scrapper
+	CheckUrl               func(string) error
+	clientCacheInvalidator cache.Invalidator
+	logger                 *slog.Logger
 }
 
-func NewLinkService(repo repository.LinkRepository, scrapper scrapper.Scrapper) *LinkServiceImpl {
+func NewLinkService(
+	repo repository.LinkRepository,
+	scrapper scrapper.Scrapper,
+	clientCacheInvalidator cache.Invalidator,
+	logger *slog.Logger,
+) *LinkServiceImpl {
 	return &LinkServiceImpl{
-		linkRepo: repo,
-		scrapper: scrapper,
-		CheckUrl: utils.CheckUrl,
+		linkRepo:               repo,
+		scrapper:               scrapper,
+		CheckUrl:               utils.CheckUrl,
+		clientCacheInvalidator: clientCacheInvalidator,
+		logger:                 logger,
 	}
 }
 
@@ -41,6 +52,10 @@ func (s *LinkServiceImpl) AddChat(chatID int64) error {
 }
 
 func (s *LinkServiceImpl) DeleteChat(chatID int64) error {
+	if err := s.clientCacheInvalidator.Invalidate(chatID); err != nil {
+		s.logger.Error(fmt.Sprintf("delete chat: invalidate cache for chatID %d: %v", chatID, err))
+	}
+
 	return s.linkRepo.DeleteChat(chatID)
 }
 
@@ -67,9 +82,16 @@ func (s *LinkServiceImpl) AddLink(chatID int64, link domain.Link) (int64, error)
 		return 0, err
 	}
 
+	if err := s.clientCacheInvalidator.Invalidate(chatID); err != nil {
+		s.logger.Error(fmt.Sprintf("add link: invalidate cache for chatID %d: %v", chatID, err))
+	}
+
 	return id, nil
 }
 
 func (s *LinkServiceImpl) DeleteLink(chatID int64, linkURL string) (*domain.LinkWithID, error) {
+	if err := s.clientCacheInvalidator.Invalidate(chatID); err != nil {
+		s.logger.Error(fmt.Sprintf("delete link: invalidate cache for chatID %d: %v", chatID, err))
+	}
 	return s.linkRepo.DeleteLink(chatID, linkURL)
 }

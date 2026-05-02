@@ -52,6 +52,12 @@ var (
 	stackoverflowTestUrl  = stackoverflowTestPath + "/test-question"
 )
 
+type invalidatorStab struct{}
+
+func (s *invalidatorStab) Invalidate(int64) error {
+	return nil
+}
+
 type apiTestContainers struct {
 	kafka    *kafka.KafkaContainer
 	postgres *postgres.PostgresContainer
@@ -267,7 +273,7 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperSqlRepositoryRestUpdater() {
 		s.Require().NoError(closeSQL())
 	}()
 
-	linkService := link.NewLinkService(sqlRepo, s.scrapperService)
+	linkService := link.NewLinkService(sqlRepo, s.scrapperService, &invalidatorStab{}, s.logger)
 	linkService.CheckUrl = func(url string) error { return nil }
 	scrapperServer := restHandlers.NewScrapperRestServer(linkService, s.logger, cache.NewNoCache())
 	scrapperHandler := restScrapper.HandlerWithOptions(scrapperServer, restScrapper.StdHTTPServerOptions{})
@@ -307,7 +313,7 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperOrmRepositoryKafkaUpdater() {
 		s.Require().NoError(closeORM())
 	}()
 
-	linkService := link.NewLinkService(ormRepo, s.scrapperService)
+	linkService := link.NewLinkService(ormRepo, s.scrapperService, &invalidatorStab{}, s.logger)
 	linkService.CheckUrl = func(url string) error { return nil }
 	grpcLis := bufconn.Listen(1024 * 1024)
 	grpcServer := grpc.NewServer()
@@ -324,7 +330,7 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperOrmRepositoryKafkaUpdater() {
 		grpcWG.Wait()
 	}()
 
-	scrapperAdapterImpl, err := scrapperAdapter.NewScrapperAdapterRPC(
+	scrapperRpcAdapter, err := scrapperAdapter.NewScrapperAdapterRPC(
 		"passthrough:///bufnet",
 		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
 			return grpcLis.Dial()
@@ -332,13 +338,13 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperOrmRepositoryKafkaUpdater() {
 	)
 	s.Require().NoError(err)
 	defer func() {
-		s.Require().NoError(scrapperAdapterImpl.ConnClose())
+		s.Require().NoError(scrapperRpcAdapter.ConnClose())
 	}()
 
 	stateRepo := stateRepository.NewInMemoryStateRepo()
 	ctrl := gomock.NewController(s.T())
 	mockBotApi := chatMocks.NewMockBotApi(ctrl)
-	chatController, err := chat.NewChatController(mockBotApi, scrapperAdapterImpl, stateRepo, s.logger)
+	chatController, err := chat.NewChatController(mockBotApi, scrapperRpcAdapter, stateRepo, s.logger)
 	s.Require().NoError(err)
 
 	deliveryService := delivery.NewDeliveryService(chatController)

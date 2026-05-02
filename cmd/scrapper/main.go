@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/redis/go-redis/v9"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/cache"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	rest_handlers "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/rest"
@@ -135,17 +136,28 @@ func NewApp() *fx.App {
 				link_service.NewLinkService,
 				fx.As(new(link_service.LinkService)),
 			),
+			func(cfg *config.Config, logger *slog.Logger) *redis.Client {
+				if cfg.ValKey.Addr == "" {
+					logger.Info("cache disabled; using no-cache")
+					return nil
+				}
+
+				return cache.NewRedisClient(&cfg.ValKey)
+			},
 			fx.Annotate(
-				func(cfg *config.Config, logger *slog.Logger) cache.Cache {
+				func(rdb *redis.Client, cfg *config.Config, logger *slog.Logger) cache.Cache {
 					if cfg.ValKey.Addr == "" {
 						logger.Info("cache disabled; using no-cache")
 						return cache.NewNoCache()
 					}
 
-					return cache.NewValKeyCache(&cfg.ValKey)
+					return cache.NewValKeyCache(rdb, &cfg.ValKey, "scrapper")
 				},
 				fx.As(new(cache.Cache)),
 			),
+			func(rdb *redis.Client) cache.Invalidator {
+				return cache.NewValKeyInvalidator(rdb)
+			},
 			rest_handlers.NewScrapperRestServer,
 			rpc_handlers.NewScrapperRPCServer,
 			scrapper.NewScrapper,

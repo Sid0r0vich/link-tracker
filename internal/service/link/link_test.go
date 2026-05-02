@@ -8,10 +8,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/logs"
 	repoMock "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link/mocks"
 	scrapperMock "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/scrapper/mocks"
 	"go.uber.org/mock/gomock"
 )
+
+type invalidatorStab struct{}
+
+func (s *invalidatorStab) Invalidate(int64) error {
+	return nil
+}
 
 func TestLinkService_AddChat(t *testing.T) {
 	t.Parallel()
@@ -21,7 +28,7 @@ func TestLinkService_AddChat(t *testing.T) {
 
 	repo := repoMock.NewMockLinkRepository(ctrl)
 	scr := scrapperMock.NewMockScrapper(ctrl)
-	service := NewLinkService(repo, scr)
+	service := NewLinkService(repo, scr, &invalidatorStab{}, logs.NewLogger())
 	service.CheckUrl = func(string) error { return nil }
 	сhatID := int64(42)
 
@@ -38,7 +45,7 @@ func TestLinkService_DeleteChat(t *testing.T) {
 
 	repo := repoMock.NewMockLinkRepository(ctrl)
 	scr := scrapperMock.NewMockScrapper(ctrl)
-	service := NewLinkService(repo, scr)
+	service := NewLinkService(repo, scr, &invalidatorStab{}, logs.NewLogger())
 	service.CheckUrl = func(string) error { return nil }
 	chatID := int64(12)
 
@@ -57,7 +64,7 @@ func TestLinkService_GetLinks(t *testing.T) {
 
 	repo := repoMock.NewMockLinkRepository(ctrl)
 	scr := scrapperMock.NewMockScrapper(ctrl)
-	service := NewLinkService(repo, scr)
+	service := NewLinkService(repo, scr, &invalidatorStab{}, logs.NewLogger())
 	chatID := int64(7)
 
 	expected := []domain.LinkWithID{{ID: 1, Link: domain.Link{URL: "https://example.com"}}}
@@ -76,7 +83,7 @@ func TestLinkService_AddLink_ForwardError(t *testing.T) {
 
 	repo := repoMock.NewMockLinkRepository(ctrl)
 	scr := scrapperMock.NewMockScrapper(ctrl)
-	service := NewLinkService(repo, scr)
+	service := NewLinkService(repo, scr, &invalidatorStab{}, logs.NewLogger())
 	service.CheckUrl = func(string) error { return nil }
 
 	input := domain.Link{URL: "https://bad.example.com"}
@@ -96,7 +103,7 @@ func TestLinkService_AddLink_SetsZeroUpdatedAtBeforeRepository(t *testing.T) {
 
 	repo := repoMock.NewMockLinkRepository(ctrl)
 	scr := scrapperMock.NewMockScrapper(ctrl)
-	service := NewLinkService(repo, scr)
+	service := NewLinkService(repo, scr, &invalidatorStab{}, logs.NewLogger())
 	service.CheckUrl = func(string) error { return nil }
 
 	chatID := int64(5)
@@ -131,7 +138,7 @@ func TestLinkService_DeleteLink(t *testing.T) {
 
 	repo := repoMock.NewMockLinkRepository(ctrl)
 	scr := scrapperMock.NewMockScrapper(ctrl)
-	service := NewLinkService(repo, scr)
+	service := NewLinkService(repo, scr, &invalidatorStab{}, logs.NewLogger())
 	url := "https://example.com"
 	chatID := int64(422)
 	expectedLink := domain.LinkWithID{

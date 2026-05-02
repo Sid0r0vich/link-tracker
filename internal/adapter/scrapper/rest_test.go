@@ -27,7 +27,7 @@ func TestAddChat_Success(t *testing.T) {
 			},
 		}, nil)
 
-	adapter := &scrapper.ScrapperAdapterImpl{Client: mockClient}
+	adapter := &scrapper.ScrapperRestAdapter{Client: mockClient}
 
 	err := adapter.AddChat(chatID)
 	assert.NoError(t, err)
@@ -48,7 +48,7 @@ func TestAddChat_Failure(t *testing.T) {
 			},
 		}, nil)
 
-	adapter := &scrapper.ScrapperAdapterImpl{Client: mockClient}
+	adapter := &scrapper.ScrapperRestAdapter{Client: mockClient}
 
 	err := adapter.AddChat(chatID)
 	assert.Error(t, err)
@@ -87,7 +87,7 @@ func TestGetLinks_Success(t *testing.T) {
 			},
 		}, nil)
 
-	adapter := &scrapper.ScrapperAdapterImpl{Client: mockClient}
+	adapter := &scrapper.ScrapperRestAdapter{Client: mockClient}
 	result, err := adapter.GetLinks(chatID)
 	assert.NoError(t, err)
 

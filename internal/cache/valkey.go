@@ -2,33 +2,37 @@ package cache
 
 import (
 	"context"
-	"strconv"
+	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 )
 
-func idToStr(chatID int64) string {
-	return strconv.FormatInt(chatID, 10)
-}
-
 type ValKeyCache struct {
 	client         *redis.Client
 	expirationTime time.Duration
+	prefix         string
 }
 
-func NewValKeyCache(cfg *config.ValKeyConfig) *ValKeyCache {
-	client := redis.NewClient(&redis.Options{
+func NewRedisClient(cfg *config.ValKeyConfig) *redis.Client {
+	return redis.NewClient(&redis.Options{
 		Addr:     cfg.Addr,
 		Username: cfg.User,
 		Password: cfg.Password,
 	})
-	return &ValKeyCache{client: client, expirationTime: cfg.ExpirationTime}
+}
+
+func NewValKeyCache(client *redis.Client, cfg *config.ValKeyConfig, prefix string) *ValKeyCache {
+	return &ValKeyCache{client: client, expirationTime: cfg.ExpirationTime, prefix: prefix}
+}
+
+func (c *ValKeyCache) idToStr(chatID int64) string {
+	return fmt.Sprintf("%s:%d", c.prefix, chatID)
 }
 
 func (c *ValKeyCache) Get(chatID int64) ([]byte, error) {
-	value, err := c.client.Get(context.Background(), idToStr(chatID)).Result()
+	value, err := c.client.Get(context.Background(), c.idToStr(chatID)).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return nil, ErrCacheMiss
@@ -40,9 +44,21 @@ func (c *ValKeyCache) Get(chatID int64) ([]byte, error) {
 }
 
 func (c *ValKeyCache) Set(chatID int64, data []byte) error {
-	return c.client.Set(context.Background(), idToStr(chatID), data, c.expirationTime).Err()
+	return c.client.Set(context.Background(), c.idToStr(chatID), data, c.expirationTime).Err()
 }
 
 func (c *ValKeyCache) Delete(chatID int64) error {
-	return c.client.Del(context.Background(), idToStr(chatID)).Err()
+	return c.client.Del(context.Background(), c.idToStr(chatID)).Err()
+}
+
+type ValKeyInvalidator struct {
+	client *redis.Client
+}
+
+func NewValKeyInvalidator(client *redis.Client) *ValKeyInvalidator {
+	return &ValKeyInvalidator{client: client}
+}
+
+func (i *ValKeyInvalidator) Invalidate(chatID int64) error {
+	return i.client.Publish(context.Background(), "invalidate", chatID).Err()
 }

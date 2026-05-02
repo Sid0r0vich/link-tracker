@@ -35,10 +35,15 @@ func (s *ValkeyTestSuite) SetupSuite() {
 	s.Require().NoError(err)
 
 	s.expirationTime = time.Second
-	s.cache = cache.NewValKeyCache(&config.ValKeyConfig{
+	cfg := &config.ValKeyConfig{
 		Addr:           fmt.Sprintf("localhost:%s", port.Port()),
 		ExpirationTime: s.expirationTime,
-	})
+	}
+	s.cache = cache.NewValKeyCache(
+		cache.NewRedisClient(cfg),
+		cfg,
+		"test",
+	)
 }
 
 func (s *ValkeyTestSuite) TearDownSuite() {

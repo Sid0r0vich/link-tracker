@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/adapter/scrapper"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/broker"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/cache"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/chat"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	brokerhandler "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/broker"
@@ -72,10 +74,15 @@ func NewApp() *fx.App {
 			utils.GetContext,
 			config.LoadConfig,
 			logs.NewLogger,
-			func(cfg *config.Config, lifecycle fx.Lifecycle, logger *slog.Logger) (scrapper.ScrapperAdapter, error) {
+			func(ctx context.Context, cfg *config.Config, lifecycle fx.Lifecycle, logger *slog.Logger) (scrapper.ScrapperAdapter, error) {
+				var adapter scrapper.ScrapperAdapter
 				switch cfg.Scrapper.TransportProtocol {
 				case config.TransportProtocolHTTP:
-					return scrapper.NewScrapperAdapterRest(fmt.Sprintf("http://%s", cfg.Scrapper.ServerAddr))
+					var err error
+					adapter, err = scrapper.NewScrapperAdapterRest(fmt.Sprintf("http://%s", cfg.Scrapper.ServerAddr))
+					if err != nil {
+						return nil, fmt.Errorf("create REST adapter: %v", err)
+					}
 
 				case config.TransportProtocolGRPC:
 					grpcAdapter, err := scrapper.NewScrapperAdapterRPC("link-tracker-scrapper:1234")
@@ -89,10 +96,32 @@ func NewApp() *fx.App {
 						},
 					})
 
-					return grpcAdapter, nil
+					adapter = grpcAdapter
+
+				default:
+					return nil, fmt.Errorf("invalid transport protocol: %s", cfg.Scrapper.TransportProtocol)
 				}
 
-				return nil, fmt.Errorf("invalid transport protocol: %s", cfg.Scrapper.TransportProtocol)
+				rdb := cache.NewRedisClient(&cfg.ValKey)
+				cache := cache.NewValKeyCache(rdb, &cfg.ValKey, "bot")
+				pubsub := rdb.Subscribe(ctx, "invalidate")
+
+				go func() {
+					for msg := range pubsub.Channel() {
+						key := msg.Payload
+						chatID, err := strconv.ParseInt(key, 10, 64)
+						if err != nil {
+							logger.Error("failed to parse chatID from cache invalidation message", "key", key, "error", err)
+							continue
+						}
+
+						logger.Info("invalidate cache", "key", key)
+						if err := cache.Delete(chatID); err != nil {
+							logger.Error("failed to invalidate cache", "key", key, "error", err)
+						}
+					}
+				}()
+				return scrapper.NewCachedScrapperAdapter(adapter, cache, logger), nil
 			},
 			state_repository.NewInMemoryStateRepo,
 			func(

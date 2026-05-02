@@ -11,20 +11,20 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/scrapper/rest"
 )
 
-type ScrapperAdapterImpl struct {
+type ScrapperRestAdapter struct {
 	Client rest.ClientWithResponsesInterface
 }
 
-func NewScrapperAdapterRest(baseURL string) (*ScrapperAdapterImpl, error) {
+func NewScrapperAdapterRest(baseURL string) (*ScrapperRestAdapter, error) {
 	c, err := rest.NewClientWithResponses(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("scrapper service create: %w", err)
 	}
 
-	return &ScrapperAdapterImpl{Client: c}, nil
+	return &ScrapperRestAdapter{Client: c}, nil
 }
 
-func (s *ScrapperAdapterImpl) AddChat(chatID int64) error {
+func (s *ScrapperRestAdapter) AddChat(chatID int64) error {
 	ctx := context.Background()
 
 	resp, err := s.Client.PostTgChatIdWithResponse(ctx, chatID)
@@ -41,7 +41,7 @@ func (s *ScrapperAdapterImpl) AddChat(chatID int64) error {
 	}
 }
 
-func (s *ScrapperAdapterImpl) DeleteChat(chatID int64) error {
+func (s *ScrapperRestAdapter) DeleteChat(chatID int64) error {
 	ctx := context.Background()
 
 	resp, err := s.Client.DeleteTgChatIdWithResponse(ctx, chatID)
@@ -58,7 +58,7 @@ func (s *ScrapperAdapterImpl) DeleteChat(chatID int64) error {
 	}
 }
 
-func (s *ScrapperAdapterImpl) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
+func (s *ScrapperRestAdapter) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 	ctx := context.Background()
 	params := rest.GetLinksParams{TgChatId: chatID}
 
@@ -78,7 +78,7 @@ func (s *ScrapperAdapterImpl) GetLinks(chatID int64) ([]domain.LinkWithID, error
 	}
 }
 
-func (s *ScrapperAdapterImpl) AddLink(chatID int64, link domain.Link) error {
+func (s *ScrapperRestAdapter) AddLink(chatID int64, link domain.Link) error {
 	ctx := context.Background()
 	params := rest.PostLinksParams{TgChatId: chatID}
 	body := rest.PostLinksJSONRequestBody{
@@ -142,7 +142,7 @@ func (s *ScrapperAdapterImpl) AddLink(chatID int64, link domain.Link) error {
 	return uerrors.ErrInternal
 }
 
-func (s *ScrapperAdapterImpl) DeleteLink(chatID int64, url string) error {
+func (s *ScrapperRestAdapter) DeleteLink(chatID int64, url string) error {
 	ctx := context.Background()
 	params := rest.DeleteLinksParams{TgChatId: chatID}
 	body := rest.DeleteLinksJSONRequestBody{

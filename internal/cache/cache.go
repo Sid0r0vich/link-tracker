@@ -9,3 +9,7 @@ type Cache interface {
 	Set(chatID int64, data []byte) error
 	Delete(chatID int64) error
 }
+
+type Invalidator interface {
+	Invalidate(chatID int64) error
+}
