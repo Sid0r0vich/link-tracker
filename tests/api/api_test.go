@@ -52,12 +52,6 @@ var (
 	stackoverflowTestUrl  = stackoverflowTestPath + "/test-question"
 )
 
-type invalidatorStab struct{}
-
-func (s *invalidatorStab) Invalidate(int64) error {
-	return nil
-}
-
 type apiTestContainers struct {
 	kafka    *kafka.KafkaContainer
 	postgres *postgres.PostgresContainer
@@ -273,7 +267,7 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperSqlRepositoryRestUpdater() {
 		s.Require().NoError(closeSQL())
 	}()
 
-	linkService := link.NewLinkService(sqlRepo, s.scrapperService, &invalidatorStab{}, s.logger)
+	linkService := link.NewLinkService(sqlRepo, s.scrapperService, cache.NewNoCacheInvalidator(), s.logger)
 	linkService.CheckUrl = func(url string) error { return nil }
 	scrapperServer := restHandlers.NewScrapperRestServer(linkService, s.logger, cache.NewNoCache())
 	scrapperHandler := restScrapper.HandlerWithOptions(scrapperServer, restScrapper.StdHTTPServerOptions{})
@@ -313,7 +307,7 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperOrmRepositoryKafkaUpdater() {
 		s.Require().NoError(closeORM())
 	}()
 
-	linkService := link.NewLinkService(ormRepo, s.scrapperService, &invalidatorStab{}, s.logger)
+	linkService := link.NewLinkService(ormRepo, s.scrapperService, cache.NewNoCacheInvalidator(), s.logger)
 	linkService.CheckUrl = func(url string) error { return nil }
 	grpcLis := bufconn.Listen(1024 * 1024)
 	grpcServer := grpc.NewServer()

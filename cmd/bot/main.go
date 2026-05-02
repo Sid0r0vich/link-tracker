@@ -102,26 +102,30 @@ func NewApp() *fx.App {
 					return nil, fmt.Errorf("invalid transport protocol: %s", cfg.Scrapper.TransportProtocol)
 				}
 
-				rdb := cache.NewRedisClient(&cfg.ValKey)
-				cache := cache.NewValKeyCache(rdb, &cfg.ValKey, "bot")
-				pubsub := rdb.Subscribe(ctx, "invalidate")
+				var clientCache cache.Cache = cache.NewNoCache()
+				if cfg.Bot.CacheEnabled {
+					rdb := cache.NewRedisClient(&cfg.ValKey)
+					clientCache = cache.NewValKeyCache(rdb, &cfg.ValKey, "bot")
+					pubsub := rdb.Subscribe(ctx, "invalidate")
 
-				go func() {
-					for msg := range pubsub.Channel() {
-						key := msg.Payload
-						chatID, err := strconv.ParseInt(key, 10, 64)
-						if err != nil {
-							logger.Error("failed to parse chatID from cache invalidation message", "key", key, "error", err)
-							continue
-						}
+					go func() {
+						for msg := range pubsub.Channel() {
+							key := msg.Payload
+							chatID, err := strconv.ParseInt(key, 10, 64)
+							if err != nil {
+								logger.Error("failed to parse chatID from cache invalidation message", "key", key, "error", err)
+								continue
+							}
 
-						logger.Info("invalidate cache", "key", key)
-						if err := cache.Delete(chatID); err != nil {
-							logger.Error("failed to invalidate cache", "key", key, "error", err)
+							logger.Info("invalidate cache", "key", key)
+							if err := clientCache.Delete(chatID); err != nil {
+								logger.Error("failed to invalidate cache", "key", key, "error", err)
+							}
 						}
-					}
-				}()
-				return scrapper.NewCachedScrapperAdapter(adapter, cache, logger), nil
+					}()
+				}
+
+				return scrapper.NewCachedScrapperAdapter(adapter, clientCache, logger), nil
 			},
 			state_repository.NewInMemoryStateRepo,
 			func(

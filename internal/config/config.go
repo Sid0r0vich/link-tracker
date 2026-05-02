@@ -79,8 +79,9 @@ type DatabaseConfig struct {
 }
 
 type BotConfig struct {
-	Token      string `mapstructure:"token"`
-	ServerAddr string `mapstructure:"server_addr"`
+	Token        string `mapstructure:"token"`
+	ServerAddr   string `mapstructure:"server_addr"`
+	CacheEnabled bool   `mapstructure:"cache_enabled"`
 }
 
 type ScrapperConfig struct {
@@ -91,6 +92,7 @@ type ScrapperConfig struct {
 	TransportProtocol       TransportProtocol       `mapstructure:"transport_protocol"`
 	JobDelayInterval        time.Duration           `mapstructure:"job_delay_interval"`
 	UpdateCommunicationType UpdateCommunicationType `mapstructure:"update_communication_type"`
+	CacheEnabled            bool                    `mapstructure:"cache_enabled"`
 }
 
 type KafkaConfig struct {

@@ -143,8 +143,7 @@ func (s *ScrapperRestServer) DeleteLinks(w http.ResponseWriter, r *http.Request,
 func (s *ScrapperRestServer) GetLinks(w http.ResponseWriter, r *http.Request, params api.GetLinksParams) {
 	w.Header().Set("Content-Type", "application/json")
 
-	cachedResp, err := s.Cache.Get(params.TgChatId)
-	if err == nil {
+	if cachedResp, err := s.Cache.Get(params.TgChatId); err == nil {
 		s.Logger.Debug("get links: cache hit, resp", "resp", string(cachedResp))
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write(cachedResp)
@@ -152,9 +151,7 @@ func (s *ScrapperRestServer) GetLinks(w http.ResponseWriter, r *http.Request, pa
 			s.Logger.Error(err.Error())
 		}
 		return
-	}
-
-	if !errors.Is(err, cache.ErrCacheMiss) {
+	} else if !errors.Is(err, cache.ErrCacheMiss) {
 		s.Logger.Error(err.Error())
 		writeJSONError(w, err)
 		return

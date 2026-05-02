@@ -15,3 +15,13 @@ func (c *NoCache) Set(chatID int64, data []byte) error {
 func (c *NoCache) Delete(chatID int64) error {
 	return nil
 }
+
+type NoCacheInvalidator struct{}
+
+func NewNoCacheInvalidator() *NoCacheInvalidator {
+	return &NoCacheInvalidator{}
+}
+
+func (i *NoCacheInvalidator) Invalidate(chatID int64) error {
+	return nil
+}
