@@ -1,4 +1,4 @@
-package repository_test
+package link_test
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/db"
-	sql_link_repo "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link/postgres/sql"
+	sql_link_repo "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
 )
 
 type SqlRepoTestSuite struct {
@@ -52,7 +52,7 @@ func (s *SqlRepoTestSuite) SetupSuite() {
 	migrateCfg, err := pgx.ParseConfig(connStr)
 	require.NoError(s.T(), err, "failed to parse connection string for migrations")
 
-	require.NoError(s.T(), db.Migrate(migrateCfg), "failed to execute migrations")
+	require.NoError(s.T(), db.Migrate(migrateCfg, "../../../db/migrations"), "failed to execute migrations")
 
 	s.sqlRepo = sql_link_repo.NewSqlLinkService(s.pool, SubscriptionBatchSize)
 }

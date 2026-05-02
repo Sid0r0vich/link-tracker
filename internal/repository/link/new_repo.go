@@ -7,8 +7,6 @@ import (
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/db"
-	orm_link_repo "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link/postgres/orm"
-	sql_link_repo "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link/postgres/sql"
 )
 
 func NewSQLRepo(
@@ -25,7 +23,7 @@ func NewSQLRepo(
 		return nil, nil, fmt.Errorf("connect to db: %w", err)
 	}
 
-	return sql_link_repo.NewSqlLinkService(pool, cfg.SubscriptionBatchSize), func() error {
+	return NewSqlLinkService(pool, cfg.SubscriptionBatchSize), func() error {
 		db.CloseDBConn()
 		return nil
 	}, nil
@@ -40,5 +38,5 @@ func NewORMRepo(
 		return nil, nil, fmt.Errorf("fail to open database: %v", err)
 	}
 
-	return orm_link_repo.NewORMLinkService(db, cfg.SubscriptionBatchSize), db.Close, nil
+	return NewORMLinkService(db, cfg.SubscriptionBatchSize), db.Close, nil
 }

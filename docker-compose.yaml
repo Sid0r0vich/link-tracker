@@ -146,15 +146,16 @@ services:
       start_period: 10s
 
   valkey:
-    image: valkey/valkey:9.0.3
-    command: ["valkey-server", "/etc/valkey/valkey.conf"]
+    image: bitnami/valkey:latest
+    container_name: valkey
     ports:
       - "6379:6379"
+    environment:
+      - VALKEY_PASSWORD=$VALKEY_PASSWORD
     networks:
       - markdown
     volumes:
-      - ./valkey.conf:/etc/valkey/valkey.conf
-      - ./users.acl:/etc/valkey/users.acl
+      - valkeydata:/bitnami/valkey
     restart: unless-stopped
 
 networks:
@@ -163,3 +164,4 @@ networks:
 
 volumes:
   pgdata:
+  valkeydata:

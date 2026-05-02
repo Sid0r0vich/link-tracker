@@ -34,4 +34,5 @@ kafka:
 
 valkey:
   addr: valkey:6379
+  user: default
   expiration_time: 15m

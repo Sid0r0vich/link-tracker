@@ -3,6 +3,8 @@ package api_test
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"net"
 	"net/http/httptest"
 	"strings"
 	"sync"
@@ -26,6 +28,7 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/db"
 	brokerhandler "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/broker"
 	restHandlers "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/rest"
+	rpcHandlers "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/rpc"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/logs"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/middleware"
 	linkRepository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
@@ -38,7 +41,15 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/update"
 	restBot "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 	restScrapper "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/scrapper/rest"
+	scrapperRPC "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/scrapper/rpc"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
+)
+
+var (
+	stackoverflowTestPath = "/questions/1111111111111111111111"
+	stackoverflowTestUrl  = stackoverflowTestPath + "/test-question"
 )
 
 type apiTestContainers struct {
@@ -90,7 +101,7 @@ func newApiTestContainers(ctx context.Context, cfg *config.Config) (*apiTestCont
 		return nil, fmt.Errorf("failed to parse connection string for migrations: %v", err)
 	}
 
-	if err = db.Migrate(migrateCfg); err != nil {
+	if err = db.Migrate(migrateCfg, "../../db/migrations"); err != nil {
 		return nil, fmt.Errorf("failed to execute migrations: %v", err)
 	}
 
@@ -109,10 +120,32 @@ func (c *apiTestContainers) Terminate(ctx context.Context) error {
 	return nil
 }
 
+func (c *apiTestContainers) ClearDB(ctx context.Context) error {
+	connStr, err := c.postgres.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		return fmt.Errorf("failed to get connection string: %v", err)
+	}
+
+	dbConn, err := pgx.Connect(ctx, connStr)
+	if err != nil {
+		return fmt.Errorf("failed to connect to postgres: %v", err)
+	}
+	defer dbConn.Close(ctx)
+
+	if _, err = dbConn.Exec(ctx, "TRUNCATE TABLE subscription_tag, chat_subscription, subscription, chat"); err != nil {
+		return fmt.Errorf("failed to clean up test DB: %v", err)
+	}
+
+	return nil
+}
+
 type ApiTestSuite struct {
 	suite.Suite
-	tc  *apiTestContainers
-	cfg *config.Config
+	tc                   *apiTestContainers
+	cfg                  *config.Config
+	logger               *slog.Logger
+	stackoverflowMockApi *httptest.Server
+	scrapperService      *scrapper.ScrapperService
 }
 
 func (s *ApiTestSuite) SetupSuite() {
@@ -147,9 +180,20 @@ func (s *ApiTestSuite) SetupSuite() {
 
 	s.cfg.Kafka.Brokers, err = s.tc.kafka.Brokers(ctx)
 	require.NoError(s.T(), err)
+
+	s.logger = logs.NewLogger()
+
+	s.stackoverflowMockApi = scrapperMocks.NewMockStackoverflowAPI(s.T(), stackoverflowTestPath, time.Now().Unix(), time.Now().Unix(), "test body")
+	stackOverflowScrapper := scrapper.NewStackoverflowScrapper(s.cfg.Scrapper.StackoverflowKey)
+	stackOverflowScrapper.ApiHost = s.stackoverflowMockApi.Listener.Addr().String()
+	stackOverflowScrapper.ApiScheme = "http"
+	s.scrapperService = scrapper.NewScrapperService(map[string]scrapper.Scrapper{
+		"stackoverflow.com": stackOverflowScrapper,
+	})
 }
 
 func (s *ApiTestSuite) TearDownSuite() {
+	defer s.stackoverflowMockApi.Close()
 	require.NoError(s.T(), s.tc.Terminate(context.Background()))
 }
 
@@ -211,64 +255,129 @@ func chatWithBot(updates chan tgbotapi.Update, chatID int64, dialog []Replica) {
 	}
 }
 
-func (s *ApiTestSuite) TestApiAddLink() {
+func (s *ApiTestSuite) TestApiAddLinkRestScrapperSqlRepositoryRestUpdater() {
 	ctx, cancel := context.WithCancel(context.Background())
-	logger := logs.NewLogger()
+	defer cancel()
 
-	// scrapper init
-	sqlRepo, closeDB, err := linkRepository.NewSQLRepo(&s.cfg.Database, logger)
-	require.NoError(s.T(), err)
+	s.Require().NoError(s.tc.ClearDB(ctx))
+
+	sqlRepo, closeSQL, err := linkRepository.NewSQLRepo(&s.cfg.Database, s.logger)
+	s.Require().NoError(err)
 	defer func() {
-		require.NoError(s.T(), closeDB())
+		s.Require().NoError(closeSQL())
 	}()
 
-	updateBrokerService, err := update.NewUpdateBrokerService(ctx, &s.cfg.Kafka, logger)
-	require.NoError(s.T(), err)
-
-	stackoverflowPath := "/questions/1111111111111111111111"
-	stackoverflowUrl := stackoverflowPath + "/test-question"
-	stackoverflowMockApi := scrapperMocks.NewMockStackoverflowAPI(s.T(), stackoverflowPath, time.Now().Unix(), time.Now().Unix(), "test body")
-	defer stackoverflowMockApi.Close()
-	stackOverflowScrapper := scrapper.NewStackoverflowScrapper(s.cfg.Scrapper.StackoverflowKey)
-	stackOverflowScrapper.ApiHost = stackoverflowMockApi.Listener.Addr().String()
-	stackOverflowScrapper.ApiScheme = "http"
-	scrapperService := scrapper.NewScrapperService(map[string]scrapper.Scrapper{
-		"stackoverflow.com": stackOverflowScrapper,
-	})
-
-	sched, err := scheduler.NewScheduler(sqlRepo, logger, updateBrokerService, scrapperService, time.Second)
-	require.NoError(s.T(), err)
-	require.NoError(s.T(), sched.Start())
-	defer sched.Shutdown()
-
-	linkService := link.NewLinkService(sqlRepo, scrapperService)
+	linkService := link.NewLinkService(sqlRepo, s.scrapperService)
 	linkService.CheckUrl = func(url string) error { return nil }
-	scrapperServer := restHandlers.NewScrapperRestServer(linkService, logger, cache.NewNoCache())
+	scrapperServer := restHandlers.NewScrapperRestServer(linkService, s.logger, cache.NewNoCache())
 	scrapperHandler := restScrapper.HandlerWithOptions(scrapperServer, restScrapper.StdHTTPServerOptions{})
-	scrapperTestServer := httptest.NewServer(middleware.LoggingMiddleware(scrapperHandler, logger))
+	scrapperTestServer := httptest.NewServer(middleware.LoggingMiddleware(scrapperHandler, s.logger))
 	defer scrapperTestServer.Close()
 
-	// bot init
+	scrapperRestAdapter, err := scrapperAdapter.NewScrapperAdapterRest(scrapperTestServer.URL)
+	s.Require().NoError(err)
+
 	stateRepo := stateRepository.NewInMemoryStateRepo()
-	scrapperAdapter, err := scrapperAdapter.NewScrapperAdapterImpl(scrapperTestServer.URL)
-	require.NoError(s.T(), err)
 	ctrl := gomock.NewController(s.T())
 	mockBotApi := chatMocks.NewMockBotApi(ctrl)
-	chatController, err := chat.NewChatController(mockBotApi, scrapperAdapter, stateRepo, logger)
-	require.NoError(s.T(), err)
+	chatController, err := chat.NewChatController(mockBotApi, scrapperRestAdapter, stateRepo, s.logger)
+	s.Require().NoError(err)
+
 	deliveryService := delivery.NewDeliveryService(chatController)
-	require.NoError(s.T(), err)
-
-	handler := brokerhandler.NewBotMessageHandler(deliveryService, logger)
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		broker.StartConsumerGroup(ctx, broker.NewConfig(), logger, &s.cfg.Kafka, handler.Handle)
-	})
-
 	botServer := restHandlers.NewBotRestServer(deliveryService)
 	botHandler := restBot.HandlerWithOptions(botServer, restBot.StdHTTPServerOptions{})
-	botTestServer := httptest.NewServer(middleware.LoggingMiddleware(botHandler, logger))
+	botTestServer := httptest.NewServer(middleware.LoggingMiddleware(botHandler, s.logger))
 	defer botTestServer.Close()
+
+	updateRestService, err := update.NewUpdateRestService(botTestServer.URL)
+	s.Require().NoError(err)
+
+	testApiAddLink(ctx, s.T(), sqlRepo, updateRestService, s.scrapperService, stackoverflowTestUrl, chatController, mockBotApi, s.logger)
+}
+
+func (s *ApiTestSuite) TestApiAddLinkRestScrapperOrmRepositoryKafkaUpdater() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s.Require().NoError(s.tc.ClearDB(ctx))
+
+	ormRepo, closeORM, err := linkRepository.NewORMRepo(&s.cfg.Database, s.logger)
+	s.Require().NoError(err)
+	defer func() {
+		s.Require().NoError(closeORM())
+	}()
+
+	linkService := link.NewLinkService(ormRepo, s.scrapperService)
+	linkService.CheckUrl = func(url string) error { return nil }
+	grpcLis := bufconn.Listen(1024 * 1024)
+	grpcServer := grpc.NewServer()
+	scrapperRPCServer := rpcHandlers.NewScrapperRPCServer(linkService, s.logger)
+	scrapperRPC.RegisterScrapperAPIServer(grpcServer, scrapperRPCServer)
+
+	var grpcWG sync.WaitGroup
+	grpcWG.Go(func() {
+		_ = grpcServer.Serve(grpcLis)
+	})
+	defer func() {
+		grpcServer.Stop()
+		_ = grpcLis.Close()
+		grpcWG.Wait()
+	}()
+
+	scrapperAdapterImpl, err := scrapperAdapter.NewScrapperAdapterRPC(
+		"passthrough:///bufnet",
+		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+			return grpcLis.Dial()
+		}),
+	)
+	s.Require().NoError(err)
+	defer func() {
+		s.Require().NoError(scrapperAdapterImpl.ConnClose())
+	}()
+
+	stateRepo := stateRepository.NewInMemoryStateRepo()
+	ctrl := gomock.NewController(s.T())
+	mockBotApi := chatMocks.NewMockBotApi(ctrl)
+	chatController, err := chat.NewChatController(mockBotApi, scrapperAdapterImpl, stateRepo, s.logger)
+	s.Require().NoError(err)
+
+	deliveryService := delivery.NewDeliveryService(chatController)
+	handler := brokerhandler.NewBotMessageHandler(deliveryService, s.logger)
+
+	consumerCtx, cancelConsumer := context.WithCancel(ctx)
+	updateBrokerService, err := update.NewUpdateBrokerService(consumerCtx, &s.cfg.Kafka, s.logger)
+	s.Require().NoError(err)
+
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		_ = broker.StartConsumerGroup(consumerCtx, broker.NewConfig(), s.logger, &s.cfg.Kafka, handler.Handle)
+	})
+
+	testApiAddLink(ctx, s.T(), ormRepo, updateBrokerService, s.scrapperService, stackoverflowTestUrl, chatController, mockBotApi, s.logger)
+
+	cancelConsumer()
+	wg.Wait()
+}
+
+func testApiAddLink(
+	ctx context.Context,
+	t *testing.T,
+	repo linkRepository.LinkUnitedRepository,
+	updater scheduler.Updater,
+	scrapperService *scrapper.ScrapperService,
+	stackoverflowTestUrl string,
+	chatController *chat.ChatController,
+	mockBotApi *chatMocks.MockBotApi,
+	logger *slog.Logger,
+) {
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
+
+	// scrapper init
+	sched, err := scheduler.NewScheduler(repo, logger, updater, scrapperService, time.Second)
+	require.NoError(t, err)
+	require.NoError(t, sched.Start())
+	defer sched.Shutdown()
 
 	// test
 	chatID := int64(123)
@@ -286,7 +395,7 @@ func (s *ApiTestSuite) TestApiAddLink() {
 			Answer:   "Введите ссылку для трекинга:",
 		},
 		{
-			Question: "https://stackoverflow.com" + stackoverflowUrl,
+			Question: "https://stackoverflow.com" + stackoverflowTestUrl,
 			Answer:   "Введите теги:",
 		},
 		{
@@ -321,6 +430,7 @@ func (s *ApiTestSuite) TestApiAddLink() {
 		}
 	})
 
+	var wg sync.WaitGroup
 	wg.Go(func() {
 		chatController.HandleUpdates(ctx)
 	})
@@ -330,7 +440,7 @@ func (s *ApiTestSuite) TestApiAddLink() {
 	select {
 	case <-done:
 	case <-time.After(20 * time.Second):
-		s.T().Fatal("timeout waiting for update notification")
+		t.Fatal("timeout waiting for update notification")
 	}
 
 	cancel()

@@ -1,4 +1,4 @@
-package orm_link_repo
+package link
 
 import (
 	"context"

@@ -15,7 +15,7 @@ type ScrapperAdapterImpl struct {
 	Client rest.ClientWithResponsesInterface
 }
 
-func NewScrapperAdapterImpl(baseURL string) (*ScrapperAdapterImpl, error) {
+func NewScrapperAdapterRest(baseURL string) (*ScrapperAdapterImpl, error) {
 	c, err := rest.NewClientWithResponses(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("scrapper service create: %w", err)

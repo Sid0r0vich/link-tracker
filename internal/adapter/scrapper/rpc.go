@@ -19,8 +19,9 @@ type ScrapperAdapterRPC struct {
 	client rpc.ScrapperAPIClient
 }
 
-func NewScrapperAdapterRPC(target string) (*ScrapperAdapterRPC, error) {
-	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func NewScrapperAdapterRPC(target string, opts ...grpc.DialOption) (*ScrapperAdapterRPC, error) {
+	allOpts := append([]grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}, opts...)
+	conn, err := grpc.NewClient(target, allOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to target %s: %v", target, err)
 	}

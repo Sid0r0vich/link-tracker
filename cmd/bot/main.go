@@ -75,7 +75,7 @@ func NewApp() *fx.App {
 			func(cfg *config.Config, lifecycle fx.Lifecycle, logger *slog.Logger) (scrapper.ScrapperAdapter, error) {
 				switch cfg.Scrapper.TransportProtocol {
 				case config.TransportProtocolHTTP:
-					return scrapper.NewScrapperAdapterImpl(fmt.Sprintf("http://%s", cfg.Scrapper.ServerAddr))
+					return scrapper.NewScrapperAdapterRest(fmt.Sprintf("http://%s", cfg.Scrapper.ServerAddr))
 
 				case config.TransportProtocolGRPC:
 					grpcAdapter, err := scrapper.NewScrapperAdapterRPC("link-tracker-scrapper:1234")
