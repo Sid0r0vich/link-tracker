@@ -48,7 +48,7 @@ import (
 )
 
 var (
-	stackoverflowTestPath = "/questions/1111111111111111111111"
+	stackoverflowTestPath = "/questions/1"
 	stackoverflowTestUrl  = stackoverflowTestPath + "/test-question"
 )
 
@@ -170,7 +170,8 @@ func (s *ApiTestSuite) SetupSuite() {
 			MinInsyncReplicas: 1,
 		},
 		Scrapper: config.ScrapperConfig{
-			JobDelayInterval: 1 * time.Second,
+			JobDelayInterval:     1 * time.Second,
+			UrlValidationEnabled: true,
 		},
 	}
 
@@ -267,8 +268,7 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperSqlRepositoryRestUpdater() {
 		s.Require().NoError(closeSQL())
 	}()
 
-	linkService := link.NewLinkService(sqlRepo, s.scrapperService, cache.NewNoCacheInvalidator(), s.logger)
-	linkService.CheckUrl = func(url string) error { return nil }
+	linkService := link.NewLinkService(s.cfg, sqlRepo, s.scrapperService, cache.NewNoCacheInvalidator(), s.logger)
 	scrapperServer := restHandlers.NewScrapperRestServer(linkService, s.logger, cache.NewNoCache())
 	scrapperHandler := restScrapper.HandlerWithOptions(scrapperServer, restScrapper.StdHTTPServerOptions{})
 	scrapperTestServer := httptest.NewServer(middleware.LoggingMiddleware(scrapperHandler, s.logger))
@@ -307,8 +307,7 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperOrmRepositoryKafkaUpdater() {
 		s.Require().NoError(closeORM())
 	}()
 
-	linkService := link.NewLinkService(ormRepo, s.scrapperService, cache.NewNoCacheInvalidator(), s.logger)
-	linkService.CheckUrl = func(url string) error { return nil }
+	linkService := link.NewLinkService(s.cfg, ormRepo, s.scrapperService, cache.NewNoCacheInvalidator(), s.logger)
 	grpcLis := bufconn.Listen(1024 * 1024)
 	grpcServer := grpc.NewServer()
 	scrapperRPCServer := rpcHandlers.NewScrapperRPCServer(linkService, s.logger)
@@ -413,6 +412,26 @@ func testApiAddLink(
 		{
 			Question: "/help",
 			Answer:   "Список доступных команд: /cancel, /help, /list, /start, /track, /untrack",
+		},
+		{
+			Question: "/list",
+			Answer:   "Ссылка: https://stackoverflow.com/questions/1/test-question\nТеги: \nФильтры: \n",
+		},
+		{
+			Question: "/track",
+			Answer:   "Введите ссылку для трекинга:",
+		},
+		{
+			Question: "https://vk.com",
+			Answer:   "Введите теги:",
+		},
+		{
+			Question: "-",
+			Answer:   "Введите фильтры:",
+		},
+		{
+			Question: "-",
+			Answer:   "Сервис для данного URL не поддерживается",
 		},
 	}
 

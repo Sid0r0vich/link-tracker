@@ -22,6 +22,7 @@ scrapper:
   job_delay_interval: 30s
   update_communication_type: kafka
   cache_enabled: true
+  url_validation_enabled: true
 
 kafka:
   brokers:

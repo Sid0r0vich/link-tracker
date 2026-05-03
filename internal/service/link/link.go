@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/cache"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
@@ -27,12 +28,13 @@ type LinkService interface {
 type LinkServiceImpl struct {
 	linkRepo               repository.LinkRepository
 	scrapper               scrapper.Scrapper
-	CheckUrl               func(string) error
 	clientCacheInvalidator cache.Invalidator
 	logger                 *slog.Logger
+	urlCheckEnabled        bool
 }
 
 func NewLinkService(
+	cfg *config.Config,
 	repo repository.LinkRepository,
 	scrapper scrapper.Scrapper,
 	clientCacheInvalidator cache.Invalidator,
@@ -41,9 +43,9 @@ func NewLinkService(
 	return &LinkServiceImpl{
 		linkRepo:               repo,
 		scrapper:               scrapper,
-		CheckUrl:               utils.CheckUrl,
 		clientCacheInvalidator: clientCacheInvalidator,
 		logger:                 logger,
+		urlCheckEnabled:        cfg.Scrapper.UrlValidationEnabled,
 	}
 }
 
@@ -64,17 +66,20 @@ func (s *LinkServiceImpl) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 }
 
 func (s *LinkServiceImpl) AddLink(chatID int64, link domain.Link) (int64, error) {
-	if err := s.CheckUrl(link.URL); err != nil {
-		fmt.Fprint(os.Stderr, "BAD URL!")
-		return 0, uerrors.ErrBadURL
+	if s.urlCheckEnabled {
+		if err := utils.CheckUrl(link.URL); err != nil {
+			fmt.Fprint(os.Stderr, "BAD URL!")
+			return 0, uerrors.ErrBadURL
+		}
+
+		update, err := s.scrapper.GetUpdate(link.URL)
+		if err != nil {
+			return 0, err
+		}
+
+		link.UpdatedAt = update.UpdatedAt
 	}
 
-	update, err := s.scrapper.GetUpdate(link.URL)
-	if err != nil {
-		return 0, err
-	}
-
-	link.UpdatedAt = update.UpdatedAt
 	link.UpdatedAt = time.Time{} // тест, сервис возвращает не актуальные, а все обновления
 
 	id, err := s.linkRepo.AddLink(chatID, link)

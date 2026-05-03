@@ -102,18 +102,12 @@ func (s *ScrapperRestAdapter) AddLink(chatID int64, link domain.Link) error {
 		return uerrors.ErrLinkNotFound
 
 	case http.StatusBadRequest:
-		if resp.JSON400 == nil {
-			var errResp rest.ApiErrorResponse
-			err = json.Unmarshal(resp.Body, &errResp)
-			if err != nil {
-				return fmt.Errorf("unmarshal error response: %w", err)
-			}
-
-			if errResp.Code == nil {
+		if resp.JSON400 != nil {
+			if resp.JSON400.Code == nil {
 				return fmt.Errorf("unexpected error response without code")
 			}
 
-			switch *errResp.Code {
+			switch *resp.JSON400.Code {
 			case "bad_url":
 				return uerrors.ErrBadURL
 

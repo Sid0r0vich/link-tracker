@@ -93,6 +93,7 @@ type ScrapperConfig struct {
 	JobDelayInterval        time.Duration           `mapstructure:"job_delay_interval"`
 	UpdateCommunicationType UpdateCommunicationType `mapstructure:"update_communication_type"`
 	CacheEnabled            bool                    `mapstructure:"cache_enabled"`
+	UrlValidationEnabled    bool                    `mapstructure:"url_validation_enabled"`
 }
 
 type KafkaConfig struct {
