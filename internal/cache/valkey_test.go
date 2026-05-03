@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	tcvalkey "github.com/testcontainers/testcontainers-go/modules/valkey"
@@ -36,11 +37,15 @@ func (s *ValkeyTestSuite) SetupSuite() {
 
 	s.expirationTime = time.Second
 	cfg := &config.ValKeyConfig{
-		Addr:           fmt.Sprintf("localhost:%s", port.Port()),
+		Addrs:          []string{fmt.Sprintf("localhost:%s", port.Port())},
 		ExpirationTime: s.expirationTime,
 	}
 	s.cache = cache.NewValKeyCache(
-		cache.NewRedisClient(cfg),
+		redis.NewClient(&redis.Options{
+			Addr:     cfg.Addrs[0],
+			Username: cfg.User,
+			Password: cfg.Password,
+		}),
 		cfg,
 		"test",
 	)

@@ -35,6 +35,9 @@ kafka:
   min_insync_replicas: 2
 
 valkey:
-  addr: valkey:6379
+  addrs: 
+    - valkey-1:7000
+    - valkey-2:7001
+    - valkey-3:7002
   user: default
   expiration_time: 15m

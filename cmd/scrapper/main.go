@@ -136,11 +136,11 @@ func NewApp() *fx.App {
 				link_service.NewLinkService,
 				fx.As(new(link_service.LinkService)),
 			),
-			func(cfg *config.Config, logger *slog.Logger) *redis.Client {
+			func(cfg *config.Config, logger *slog.Logger) *redis.ClusterClient {
 				return cache.NewRedisClient(&cfg.ValKey)
 			},
 			fx.Annotate(
-				func(rdb *redis.Client, cfg *config.Config, logger *slog.Logger) cache.Cache {
+				func(rdb *redis.ClusterClient, cfg *config.Config, logger *slog.Logger) cache.Cache {
 					if !cfg.Scrapper.CacheEnabled {
 						logger.Info("cache disabled; using no-cache")
 						return cache.NewNoCache()
@@ -150,7 +150,7 @@ func NewApp() *fx.App {
 				},
 				fx.As(new(cache.Cache)),
 			),
-			func(cfg *config.Config, rdb *redis.Client) cache.Invalidator {
+			func(cfg *config.Config, rdb *redis.ClusterClient) cache.Invalidator {
 				if !cfg.Bot.CacheEnabled {
 					return cache.NewNoCacheInvalidator()
 				}

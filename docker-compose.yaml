@@ -7,6 +7,10 @@ services:
     container_name: link-tracker-scrapper
     env_file:
       - .env
+    environment:
+      CONFIG_FILE: /config/config.yaml
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
     networks:
       - markdown
     restart: unless-stopped
@@ -23,6 +27,9 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 2s
+      timeout: 30s
+      retries: 10
 
   bot:
     image: sid00r/link-tracker-bot:latest
@@ -32,6 +39,10 @@ services:
     container_name: link-tracker-bot
     env_file:
       - .env
+    environment:
+      CONFIG_FILE: /config/config.yaml
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
     networks:
       - markdown
     restart: unless-stopped
@@ -145,18 +156,108 @@ services:
       retries: 10
       start_period: 10s
 
-  valkey:
+  valkey-1:
     image: bitnami/valkey:latest
-    container_name: valkey
-    ports:
-      - "6379:6379"
     environment:
       - VALKEY_PASSWORD=$VALKEY_PASSWORD
     networks:
       - markdown
     volumes:
-      - valkeydata:/bitnami/valkey
-    restart: unless-stopped
+      - valkey-1-data:/bitnami/valkey
+    command: >
+      valkey-server
+      --port 7000
+      --dir /bitnami/valkey
+      --protected-mode no
+      --requirepass ${VALKEY_PASSWORD}
+      --masterauth ${VALKEY_PASSWORD}
+      --cluster-enabled yes
+      --cluster-config-file /bitnami/valkey/nodes.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --cluster-announce-ip valkey-1
+      --cluster-announce-port 7000
+      --cluster-announce-bus-port 17000
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a \"$VALKEY_PASSWORD\" -p 7000 ping >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  valkey-2:
+    image: bitnami/valkey:latest
+    environment:
+      - VALKEY_PASSWORD=$VALKEY_PASSWORD
+    networks:
+      - markdown
+    volumes:
+      - valkey-2-data:/bitnami/valkey
+    command: >
+      valkey-server
+      --port 7001
+      --dir /bitnami/valkey
+      --protected-mode no
+      --requirepass ${VALKEY_PASSWORD}
+      --masterauth ${VALKEY_PASSWORD}
+      --cluster-enabled yes
+      --cluster-config-file /bitnami/valkey/nodes.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --cluster-announce-ip valkey-2
+      --cluster-announce-port 7001
+      --cluster-announce-bus-port 17001
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a \"$VALKEY_PASSWORD\" -p 7001 ping >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  valkey-3:
+    image: bitnami/valkey:latest
+    environment:
+      - VALKEY_PASSWORD=$VALKEY_PASSWORD
+    networks:
+      - markdown
+    volumes:
+      - valkey-3-data:/bitnami/valkey
+    command: >
+      valkey-server
+      --port 7002
+      --dir /bitnami/valkey
+      --protected-mode no
+      --requirepass ${VALKEY_PASSWORD}
+      --masterauth ${VALKEY_PASSWORD}
+      --cluster-enabled yes
+      --cluster-config-file /bitnami/valkey/nodes.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --cluster-announce-ip valkey-3
+      --cluster-announce-port 7002
+      --cluster-announce-bus-port 17002
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a \"$VALKEY_PASSWORD\" -p 7002 ping >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  valkey-init:
+    image: bitnami/valkey:latest
+    environment:
+      - VALKEY_PASSWORD=$VALKEY_PASSWORD
+    entrypoint: >
+      sh -c "
+        sleep 5;
+        valkey-cli -a \"$VALKEY_PASSWORD\" --cluster create valkey-1:7000 valkey-2:7001 valkey-3:7002 --cluster-replicas 0 --cluster-yes;
+      "
+    networks:
+      - markdown
+    depends_on:
+      valkey-1:
+        condition: service_healthy
+      valkey-2:
+        condition: service_healthy
+      valkey-3:
+        condition: service_healthy
 
 networks:
   markdown:
@@ -164,4 +265,6 @@ networks:
 
 volumes:
   pgdata:
-  valkeydata:
+  valkey-1-data:
+  valkey-2-data:
+  valkey-3-data:

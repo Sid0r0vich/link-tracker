@@ -105,7 +105,7 @@ type KafkaConfig struct {
 }
 
 type ValKeyConfig struct {
-	Addr           string        `mapstructure:"addr"`
+	Addrs          []string      `mapstructure:"addrs"`
 	User           string        `mapstructure:"user"`
 	Password       string        `mapstructure:"password"`
 	ExpirationTime time.Duration `mapstructure:"expiration_time"`

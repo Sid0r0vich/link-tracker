@@ -8,7 +8,7 @@ RUN go build -o scrapper cmd/scrapper/main.go
 
 FROM alpine:latest
 
-WORKDIR /root/
+WORKDIR /root
 COPY --from=builder /scrapper .
 COPY config.yaml config.yaml
 CMD ["./scrapper"]

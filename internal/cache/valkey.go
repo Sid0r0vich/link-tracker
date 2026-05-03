@@ -10,20 +10,20 @@ import (
 )
 
 type ValKeyCache struct {
-	client         *redis.Client
+	client         redis.Cmdable
 	expirationTime time.Duration
 	prefix         string
 }
 
-func NewRedisClient(cfg *config.ValKeyConfig) *redis.Client {
-	return redis.NewClient(&redis.Options{
-		Addr:     cfg.Addr,
+func NewRedisClient(cfg *config.ValKeyConfig) *redis.ClusterClient {
+	return redis.NewClusterClient(&redis.ClusterOptions{
+		Addrs:    cfg.Addrs,
 		Username: cfg.User,
 		Password: cfg.Password,
 	})
 }
 
-func NewValKeyCache(client *redis.Client, cfg *config.ValKeyConfig, prefix string) *ValKeyCache {
+func NewValKeyCache(client redis.Cmdable, cfg *config.ValKeyConfig, prefix string) *ValKeyCache {
 	return &ValKeyCache{client: client, expirationTime: cfg.ExpirationTime, prefix: prefix}
 }
 
@@ -52,10 +52,10 @@ func (c *ValKeyCache) Delete(chatID int64) error {
 }
 
 type ValKeyInvalidator struct {
-	client *redis.Client
+	client *redis.ClusterClient
 }
 
-func NewValKeyInvalidator(client *redis.Client) *ValKeyInvalidator {
+func NewValKeyInvalidator(client *redis.ClusterClient) *ValKeyInvalidator {
 	return &ValKeyInvalidator{client: client}
 }
 

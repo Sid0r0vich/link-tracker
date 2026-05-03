@@ -8,6 +8,6 @@ RUN go build -o bot cmd/bot/main.go
 
 FROM alpine:latest
 
-WORKDIR /root/
+WORKDIR /root
 COPY --from=builder /bot .
 CMD ["./bot"]
