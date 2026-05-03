@@ -9,6 +9,8 @@ services:
       - .env
     environment:
       CONFIG_FILE: /config/config.yaml
+    ports:
+      - "1234:1234"
     volumes:
       - ./config.yaml:/config/config.yaml:ro
     networks:
