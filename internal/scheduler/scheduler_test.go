@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	repoMock "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link/mocks"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/scheduler"
@@ -44,7 +45,7 @@ func TestScheduler_CheckUpdates_PartialFailuresAreIsolated(t *testing.T) {
 	}))
 	defer server.Close()
 
-	updater, err := update.NewUpdateRestService(server.URL)
+	updater, err := update.NewUpdateRestService(server.URL, &config.HTTPConfig{Timeout: time.Second})
 	assert.NoError(t, err)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	repo := repoMock.NewMockLinkUpdateRepository(ctrl)

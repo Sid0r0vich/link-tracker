@@ -27,10 +27,17 @@ func TestGithubScrapper_GetUpdate_NewIssueFormatsEvent(t *testing.T) {
 	defer ts.Close()
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	s := scrapper.NewGithubScrapper(&config.GithubConfig{}, logger)
+	cb := &config.CircuitBreakerConfig{
+		SlidingWindowSize:        10,
+		MinimumRequiredCalls:     1,
+		FailureRateThreshold:     100,
+		PermittedCallsInHalfOpen: 1,
+		WaitDurationInOpenState:  1 * time.Second,
+	}
+	s := scrapper.NewGithubScrapper(&config.HTTPConfig{Timeout: 5 * time.Second}, cb, "test-token", logger)
 	s.ApiScheme = "http"
 	s.ApiHost = ts.Listener.Addr().String()
-	s.Client = *ts.Client()
+	s.Client = ts.Client()
 
 	updateUrl := "https://github.com" + url
 	upd, err := s.GetUpdate(updateUrl)

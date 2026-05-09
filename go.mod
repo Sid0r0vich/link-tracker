@@ -4,6 +4,7 @@ go 1.25.1
 
 require (
 	github.com/IBM/sarama v1.47.0
+	github.com/avast/retry-go/v5 v5.0.0
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/go-co-op/gocron/v2 v2.19.1
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
@@ -11,8 +12,10 @@ require (
 	github.com/lib/pq v1.12.0
 	github.com/lmittmann/tint v1.1.3
 	github.com/oapi-codegen/runtime v1.2.0
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pressly/goose/v3 v3.27.0
 	github.com/redis/go-redis/v9 v9.19.0
+	github.com/sony/gobreaker/v2 v2.4.0
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0
@@ -22,6 +25,7 @@ require (
 	go.uber.org/fx v1.24.0
 	go.uber.org/mock v0.6.0
 	go.uber.org/thriftrw v1.34.0
+	golang.org/x/time v0.15.0
 	google.golang.org/grpc v1.79.2
 	google.golang.org/protobuf v1.36.11
 )

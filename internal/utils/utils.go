@@ -4,33 +4,37 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
-	"time"
+	"slices"
 
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"go.uber.org/fx"
 )
 
-func CheckUrl(url string, timeout time.Duration) error {
+func CheckUrl(url string, cfg *config.HTTPConfig, logger *slog.Logger) error {
 	req, err := http.NewRequest("Get", url, nil)
 	if err != nil {
 		return fmt.Errorf("making request to bot: %w", err)
 	}
 
-	client := http.Client{Timeout: timeout}
+	client := http.Client{Timeout: cfg.Timeout}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
+	return Retry(cfg, logger).Do(func() error {
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("status code not found")
-	}
+		if slices.Contains(cfg.RetryableHTTPCodes, resp.StatusCode) {
+			return fmt.Errorf("received retryable status code: %d", resp.StatusCode)
+		}
 
-	return nil
+		return nil
+	})
 }
 
 func CutDescription(description string, maxLen int) string {

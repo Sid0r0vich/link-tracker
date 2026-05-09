@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -16,16 +17,18 @@ import (
 )
 
 type StackoverflowScrapper struct {
+	httpCfg   *config.HTTPConfig
 	key       string
-	Client    http.Client
+	Client    utils.Client
 	ApiHost   string
 	ApiScheme string
 }
 
-func NewStackoverflowScrapper(cfg *config.StackoverflowConfig) *StackoverflowScrapper {
+func NewStackoverflowScrapper(cfg *config.HTTPConfig, cbCfg *config.CircuitBreakerConfig, key string, logger *slog.Logger) *StackoverflowScrapper {
 	return &StackoverflowScrapper{
-		key:       cfg.Key,
-		Client:    http.Client{Timeout: cfg.Timeout},
+		httpCfg:   cfg,
+		key:       key,
+		Client:    utils.NewRetryClient(utils.NewCircuitBreakerClient(&http.Client{Timeout: cfg.Timeout}, cbCfg, logger), cfg, logger),
 		ApiHost:   "api.stackexchange.com",
 		ApiScheme: "https",
 	}
@@ -53,10 +56,7 @@ func (s *StackoverflowScrapper) makeRequest(rurl string) (*http.Response, error)
 
 	resp, err := s.Client.Do(req)
 	if err != nil {
-		if utils.IsNetError(err) {
-			return nil, uerrors.ErrAPIUnavailable
-		}
-		return nil, uerrors.ErrBadURL
+		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {

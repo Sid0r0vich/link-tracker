@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -18,6 +19,7 @@ import (
 	rpc_handlers "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/handlers/rpc"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/logs"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/middleware"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/ratelimiter"
 	link_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/link"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/scheduler"
 	link_service "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/link"
@@ -36,6 +38,7 @@ func run(
 	sched *scheduler.Scheduler,
 	restAPI *rest_handlers.ScrapperRestServer,
 	rpcAPI *rpc_handlers.ScrapperRPCServer,
+	cache cache.Cache,
 ) error {
 	sched.Start()
 	sigChan := make(chan os.Signal, 1)
@@ -50,11 +53,13 @@ func run(
 		return fmt.Errorf("write ready file: %w", err)
 	}
 
+	ratelimiter := ratelimiter.New(cfg.HTTP.RateLimit, cfg.HTTP.RateLimitInterval, "ratelimiter")
+
 	switch cfg.Scrapper.TransportProtocol {
 	case config.TransportProtocolHTTP:
 		handler := rest.HandlerWithOptions(restAPI, rest.StdHTTPServerOptions{})
 
-		err := http.ListenAndServe(cfg.Scrapper.ServerAddr, middleware.LoggingMiddleware(handler, logger))
+		err := http.ListenAndServe(cfg.Scrapper.ServerAddr, middleware.LoggingMiddleware(middleware.RatelimiterMiddleware(handler, ratelimiter, logger), logger))
 		if err != nil {
 			return fmt.Errorf("start server: %w", err)
 		}
@@ -65,7 +70,7 @@ func run(
 			return fmt.Errorf("failed to listen: %v", err)
 		}
 
-		grpcServer := grpc.NewServer()
+		grpcServer := grpc.NewServer(grpc.UnaryInterceptor(middleware.RatelimiterUnaryInterceptor(ratelimiter, logger)))
 		rpc.RegisterScrapperAPIServer(grpcServer, rpcAPI)
 
 		if err := grpcServer.Serve(lis); err != nil {
@@ -123,11 +128,19 @@ func NewApp() *fx.App {
 				lifecycle fx.Lifecycle,
 				logger *slog.Logger,
 			) (scheduler.Updater, error) {
+				updateRestService, errRest := update.NewUpdateRestService(fmt.Sprintf("http://%s", cfg.Bot.ServerAddr), &cfg.HTTP)
+				updateKafkaService, errKafka := update.NewUpdateBrokerService(ctx, &cfg.Kafka, logger)
+
 				switch cfg.Scrapper.UpdateCommunicationType {
 				case config.UpdateCommunicationTypeHTTP:
-					return update.NewUpdateRestService(fmt.Sprintf("http://%s", cfg.Bot.ServerAddr))
+					return updateRestService, errRest
 				case config.UpdateCommunicationTypeKafka:
-					return update.NewUpdateBrokerService(ctx, &cfg.Kafka, logger)
+					return updateKafkaService, errKafka
+				case config.UpdateCommunicationTypeFallback:
+					if errRest != nil && errKafka != nil {
+						return nil, errors.Join(errRest, errKafka)
+					}
+					return update.NewUpdateFallbackService(updateRestService, updateKafkaService, logger)
 				default:
 					return nil, fmt.Errorf("invalid update communication type: %s", cfg.Scrapper.UpdateCommunicationType)
 				}

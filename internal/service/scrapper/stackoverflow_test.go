@@ -1,6 +1,8 @@
 package scrapper_test
 
 import (
+	"io"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -24,10 +26,18 @@ func TestStackoverflowScrapper_GetUpdate_NewAnswerFormatsEvent(t *testing.T) {
 	ts := mocks.NewMockStackoverflowAPI(t, url, creationDate, lastActivity, body)
 	defer ts.Close()
 
-	s := scrapper.NewStackoverflowScrapper(&config.StackoverflowConfig{Key: "test-key"})
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	cb := &config.CircuitBreakerConfig{
+		SlidingWindowSize:        10,
+		MinimumRequiredCalls:     1,
+		FailureRateThreshold:     100,
+		PermittedCallsInHalfOpen: 1,
+		WaitDurationInOpenState:  1 * time.Second,
+	}
+	s := scrapper.NewStackoverflowScrapper(&config.HTTPConfig{Timeout: 5 * time.Second}, cb, "test-key", logger)
 	s.ApiScheme = "http"
 	s.ApiHost = ts.Listener.Addr().String()
-	s.Client = *ts.Client()
+	s.Client = ts.Client()
 
 	updateUrl := "https://stackoverflow.com" + url
 	upd, err := s.GetUpdate(updateUrl)

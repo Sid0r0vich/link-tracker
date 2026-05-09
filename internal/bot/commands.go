@@ -60,7 +60,7 @@ var CmdToHandler = map[string]CmdHandler{
 			ans := "Ссылки не найдены"
 			if err != nil {
 				bot.LogError(err)
-				ans = "Ошибка на стороне сервера"
+				ans = getAnswerFromError(err)
 			}
 
 			if len(links) > 0 {

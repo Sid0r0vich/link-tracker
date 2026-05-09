@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
-	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/adapter/scrapper"
@@ -30,13 +29,13 @@ type ChatController struct {
 	stateRepo       state_repository.StateRepository
 	logger          *slog.Logger
 	scrapperAdapter scrapper.ScrapperAdapter
-	clientTimeout   time.Duration
+	httpCfg         *config.HTTPConfig
 }
 
 func NewChatController(cfg *config.Config, botApi BotApi, scrapperAdapter scrapper.ScrapperAdapter, stateRepo state_repository.StateRepository, logger *slog.Logger) (*ChatController, error) {
 	logger.Info("init chat controller")
 
-	return &ChatController{api: botApi, stateRepo: stateRepo, logger: logger, scrapperAdapter: scrapperAdapter, clientTimeout: cfg.DefaultHTTPClientTimeout}, nil
+	return &ChatController{api: botApi, stateRepo: stateRepo, logger: logger, scrapperAdapter: scrapperAdapter, httpCfg: &cfg.HTTP}, nil
 }
 
 func (b *ChatController) SetCommands(commands []tgbotapi.BotCommand) error {
@@ -220,5 +219,5 @@ func (b *ChatController) Wait(chatID int64) error {
 }
 
 func (b *ChatController) CheckUrl(url string) error {
-	return utils.CheckUrl(url, b.clientTimeout)
+	return utils.CheckUrl(url, b.httpCfg, b.logger)
 }

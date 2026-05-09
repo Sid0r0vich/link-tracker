@@ -2,30 +2,35 @@ package middleware
 
 import (
 	"bytes"
+	"context"
 	"log/slog"
 	"net/http"
 )
 
 func LoggingMiddleware(next http.Handler, logger *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger.Info("request", "from", r.Host, "method", r.Method, "URL", r.URL)
+
 		recorder := &responseRecorder{
 			ResponseWriter: w,
 			statusCode:     http.StatusOK,
 		}
-
-		logger.Info("request", "from", r.Host, "method", r.Method, "URL", r.URL)
 		next.ServeHTTP(recorder, r)
 
+		var level slog.Level = slog.LevelInfo
 		if recorder.statusCode != http.StatusOK {
-			logger.Warn(
-				"response",
-				"from", r.Host,
-				"method", r.Method,
-				"URL", r.URL,
-				"status", recorder.statusCode,
-				"body", recorder.body.String(),
-			)
+			level = slog.LevelWarn
 		}
+		logger.Log(
+			context.Background(),
+			level,
+			"response",
+			"from", r.Host,
+			"method", r.Method,
+			"URL", r.URL,
+			"status", recorder.statusCode,
+			"body", recorder.body.String(),
+		)
 	})
 }
 

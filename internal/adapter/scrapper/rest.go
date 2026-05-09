@@ -11,6 +11,15 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/scrapper/rest"
 )
 
+func errFromStatusCode(statusCode int) error {
+	switch statusCode {
+	case http.StatusTooManyRequests:
+		return uerrors.ErrTooManyRequests
+	default:
+		return uerrors.ErrInternal
+	}
+}
+
 type ScrapperRestAdapter struct {
 	Client rest.ClientWithResponsesInterface
 }
@@ -35,10 +44,9 @@ func (s *ScrapperRestAdapter) AddChat(chatID int64) error {
 	switch resp.StatusCode() {
 	case http.StatusOK:
 		return nil
-
-	default:
-		return uerrors.ErrInternal
 	}
+
+	return errFromStatusCode(resp.StatusCode())
 }
 
 func (s *ScrapperRestAdapter) DeleteChat(chatID int64) error {
@@ -52,10 +60,9 @@ func (s *ScrapperRestAdapter) DeleteChat(chatID int64) error {
 	switch resp.StatusCode() {
 	case http.StatusOK:
 		return nil
-
-	default:
-		return uerrors.ErrInternal
 	}
+
+	return errFromStatusCode(resp.StatusCode())
 }
 
 func (s *ScrapperRestAdapter) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
@@ -72,10 +79,9 @@ func (s *ScrapperRestAdapter) GetLinks(chatID int64) ([]domain.LinkWithID, error
 		links := domain.LinkResponseSliceToLinkWithID(*resp.JSON200.Links)
 
 		return links, nil
-
-	default:
-		return nil, uerrors.ErrInternal
 	}
+
+	return nil, errFromStatusCode(resp.StatusCode())
 }
 
 func (s *ScrapperRestAdapter) AddLink(chatID int64, link domain.Link) error {
@@ -133,7 +139,7 @@ func (s *ScrapperRestAdapter) AddLink(chatID int64, link domain.Link) error {
 		}
 	}
 
-	return uerrors.ErrInternal
+	return errFromStatusCode(resp.StatusCode())
 }
 
 func (s *ScrapperRestAdapter) DeleteLink(chatID int64, url string) error {
@@ -155,5 +161,5 @@ func (s *ScrapperRestAdapter) DeleteLink(chatID int64, url string) error {
 		return uerrors.ErrChatNotExistsOrLinkNotFound
 	}
 
-	return uerrors.ErrInternal
+	return errFromStatusCode(resp.StatusCode())
 }

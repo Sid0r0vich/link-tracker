@@ -52,15 +52,17 @@ func run(ctx context.Context, cfg *config.Config, chatController *chat.ChatContr
 		logger.Error("fail to set commands", "error", err)
 	}
 
-	go func() {
-		switch cfg.Scrapper.UpdateCommunicationType {
-		case config.UpdateCommunicationTypeHTTP:
-			startServer(cfg, deliveryService, logger)
+	switch cfg.Scrapper.UpdateCommunicationType {
+	case config.UpdateCommunicationTypeHTTP:
+		go startServer(cfg, deliveryService, logger)
 
-		case config.UpdateCommunicationTypeKafka:
-			startConsumer(ctx, cfg, deliveryService, logger)
-		}
-	}()
+	case config.UpdateCommunicationTypeKafka:
+		go startConsumer(ctx, cfg, deliveryService, logger)
+
+	case config.UpdateCommunicationTypeFallback:
+		go startServer(cfg, deliveryService, logger)
+		go startConsumer(ctx, cfg, deliveryService, logger)
+	}
 
 	logger.Info("handle updates")
 	chatController.HandleUpdates(ctx)

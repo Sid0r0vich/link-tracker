@@ -13,11 +13,7 @@ bot:
 
 scrapper:
   server_addr: link-tracker-scrapper:1234
-  github:
-    timeout: 5s
-  stackoverflow:
-    timeout: 5s
-  update_communication_type: kafka
+  update_communication_type: fallback
   cache_enabled: true
   url_validation_enabled: true
   old_updates_enabled: false
@@ -41,4 +37,19 @@ valkey:
   user: default
   expiration_time: 15m
 
-default_http_client_timeout: 5s
+http:
+  timeout: 5s
+  rate_limit: 5
+  rate_limit_interval: 5s
+  retry_count: 3
+  retry_delay: 2s
+  retryable_http_codes:
+    - 500
+
+circuit_breaker:
+  sliding_window_size: 10s
+  sliding_window_bucket_size: 1s
+  minimum_required_calls: 5
+  failure_rate_threshold: 100
+  permitted_calls_in_half_open_state: 5
+  wait_duration_in_open_state: 1s

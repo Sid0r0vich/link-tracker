@@ -14,6 +14,20 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+func errFromError(err error) error {
+	st, ok := status.FromError(err)
+	if !ok {
+		return uerrors.ErrInternal
+	}
+
+	switch st.Code() {
+	case codes.ResourceExhausted:
+		return uerrors.ErrTooManyRequests
+	default:
+		return uerrors.ErrInternal
+	}
+}
+
 type ScrapperRpcAdapter struct {
 	conn   *grpc.ClientConn
 	client rpc.ScrapperAPIClient
@@ -37,13 +51,20 @@ func (s *ScrapperRpcAdapter) AddChat(chatID int64) error {
 
 	_, err := s.client.RegisterChat(ctx, &rpc.RegisterChatRequest{Id: chatID})
 	if err != nil {
-		return fmt.Errorf("response: %w", err)
+		return fmt.Errorf("response: %w", errFromError(err))
 	}
 
 	return nil
 }
 
 func (s *ScrapperRpcAdapter) DeleteChat(chatID int64) error {
+	ctx := context.Background()
+
+	_, err := s.client.DeleteChat(ctx, &rpc.DeleteChatRequest{Id: chatID})
+	if err != nil {
+		return fmt.Errorf("response: %w", errFromError(err))
+	}
+
 	return nil
 }
 
@@ -55,7 +76,7 @@ func (s *ScrapperRpcAdapter) GetLinks(chatID int64) ([]domain.LinkWithID, error)
 
 	resp, err := s.client.GetLinks(ctx, &req)
 	if err != nil {
-		return nil, fmt.Errorf("response: %w", err)
+		return nil, fmt.Errorf("response: %w", errFromError(err))
 	}
 
 	links := make([]domain.LinkWithID, len(resp.GetLinks()))
@@ -102,7 +123,7 @@ func (s *ScrapperRpcAdapter) AddLink(chatID int64, link domain.Link) error {
 			}
 		}
 
-		return uerrors.ErrInternal
+		return errFromError(err)
 	}
 
 	return nil
@@ -125,7 +146,7 @@ func (s *ScrapperRpcAdapter) DeleteLink(chatID int64, url string) error {
 			}
 		}
 
-		return uerrors.ErrInternal
+		return errFromError(err)
 	}
 
 	return nil

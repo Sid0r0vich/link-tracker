@@ -238,7 +238,7 @@ func TestHandleMessage(t *testing.T) {
 			{name: "bad token", err: uerrors.ErrBadToken, ans: "Некорректный токен"},
 			{name: "too many requests", err: uerrors.ErrTooManyRequests, ans: "Слишком больше количество запросов"},
 			{name: "external api unavailable", err: uerrors.ErrAPIUnavailable, ans: "Сервис не доступен"},
-			{name: "unknown", err: errors.New("boom"), ans: "Неизвестная ошибка"},
+			{name: "unknown", err: errors.New("boom"), ans: "Ошибка на стороне сервера"},
 		}
 
 		for _, tc := range tests {

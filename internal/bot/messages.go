@@ -28,6 +28,15 @@ func getStrs(str string) []string {
 	return data
 }
 
+func getAnswerFromError(err error) string {
+	switch {
+	case errors.Is(err, uerrors.ErrTooManyRequests):
+		return "Слишком большое количество запросов"
+	}
+
+	return "Ошибка на стороне сервера"
+}
+
 var StateToHandler = map[domain.ChatState]MessageHandler{
 	domain.Wait: {Fun: func(bot API, msg *tgbotapi.Message) {
 		bot.Send(msg.Chat.ID, "Зайдите в меню, чтобы отправить команду")
@@ -81,7 +90,7 @@ var StateToHandler = map[domain.ChatState]MessageHandler{
 			case errors.Is(err, uerrors.ErrAPINotAlowed):
 				ans = "Сервис для данного URL не поддерживается"
 			default:
-				ans = "Неизвестная ошибка"
+				ans = getAnswerFromError(err)
 			}
 		}
 		bot.Send(msg.Chat.ID, ans)
@@ -95,7 +104,7 @@ var StateToHandler = map[domain.ChatState]MessageHandler{
 		ans := "Ссылка больше не отслеживается"
 		err = bot.DeleteLink(msg.Chat.ID)
 		if err != nil {
-			ans = "Ошибка на стороне сервера"
+			ans = getAnswerFromError(err)
 			if errors.Is(err, uerrors.ErrChatNotExistsOrLinkNotFound) {
 				ans = "Ссылка не найдена"
 			} else {

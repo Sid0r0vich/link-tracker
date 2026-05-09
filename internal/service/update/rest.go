@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
@@ -14,8 +15,8 @@ type UpdateRestService struct {
 	client api.ClientWithResponsesInterface
 }
 
-func NewUpdateRestService(serverAddr string) (*UpdateRestService, error) {
-	c, err := api.NewClientWithResponses(serverAddr)
+func NewUpdateRestService(serverAddr string, cfg *config.HTTPConfig) (*UpdateRestService, error) {
+	c, err := api.NewClientWithResponses(serverAddr, api.WithHTTPClient(&http.Client{Timeout: cfg.Timeout}))
 	if err != nil {
 		return nil, fmt.Errorf("update service create: %w", err)
 	}

@@ -5,7 +5,6 @@ package link
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/cache"
@@ -31,7 +30,7 @@ type LinkServiceImpl struct {
 	clientCacheInvalidator cache.Invalidator
 	logger                 *slog.Logger
 	cfg                    *config.ScrapperConfig
-	clientTimeout          time.Duration
+	httpCfg                *config.HTTPConfig
 }
 
 func NewLinkService(
@@ -47,7 +46,7 @@ func NewLinkService(
 		clientCacheInvalidator: clientCacheInvalidator,
 		logger:                 logger,
 		cfg:                    &cfg.Scrapper,
-		clientTimeout:          cfg.DefaultHTTPClientTimeout,
+		httpCfg:                &cfg.HTTP,
 	}
 }
 
@@ -69,8 +68,7 @@ func (s *LinkServiceImpl) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 
 func (s *LinkServiceImpl) AddLink(chatID int64, link domain.Link) (int64, error) {
 	if s.cfg.UrlValidationEnabled {
-		if err := utils.CheckUrl(link.URL, s.clientTimeout); err != nil {
-			fmt.Fprint(os.Stderr, "BAD URL!")
+		if err := utils.CheckUrl(link.URL, s.httpCfg, s.logger); err != nil {
 			return 0, uerrors.ErrBadURL
 		}
 

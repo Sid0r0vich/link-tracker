@@ -174,7 +174,9 @@ func (s *ApiTestSuite) SetupSuite() {
 			UrlValidationEnabled: true,
 			OldUpdatesEnabled:    true,
 		},
-		DefaultHTTPClientTimeout: time.Second * 5,
+		HTTP: config.HTTPConfig{
+			Timeout: time.Second * 5,
+		},
 	}
 
 	var err error
@@ -187,7 +189,7 @@ func (s *ApiTestSuite) SetupSuite() {
 	s.logger = logs.NewLogger()
 
 	s.stackoverflowMockApi = scrapperMocks.NewMockStackoverflowAPI(s.T(), stackoverflowTestPath, time.Now().Unix(), time.Now().Unix(), "test body")
-	stackOverflowScrapper := scrapper.NewStackoverflowScrapper(&s.cfg.Scrapper.Stackoverflow)
+	stackOverflowScrapper := scrapper.NewStackoverflowScrapper(&s.cfg.HTTP, &s.cfg.CircuitBreaker, s.cfg.Scrapper.StackoverflowKey, s.logger)
 	stackOverflowScrapper.ApiHost = s.stackoverflowMockApi.Listener.Addr().String()
 	stackOverflowScrapper.ApiScheme = "http"
 	s.scrapperService = scrapper.NewScrapperService(map[string]scrapper.Scrapper{
@@ -291,7 +293,7 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperSqlRepositoryRestUpdater() {
 	botTestServer := httptest.NewServer(middleware.LoggingMiddleware(botHandler, s.logger))
 	defer botTestServer.Close()
 
-	updateRestService, err := update.NewUpdateRestService(botTestServer.URL)
+	updateRestService, err := update.NewUpdateRestService(botTestServer.URL, &s.cfg.HTTP)
 	s.Require().NoError(err)
 
 	testApiAddLink(ctx, s.T(), sqlRepo, updateRestService, s.scrapperService, stackoverflowTestUrl, chatController, mockBotApi, s.logger)

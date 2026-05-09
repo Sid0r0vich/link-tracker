@@ -17,8 +17,9 @@ import (
 )
 
 type GithubScrapper struct {
+	httpCfg   *config.HTTPConfig
 	token     string
-	Client    http.Client
+	Client    utils.Client
 	logger    *slog.Logger
 	ApiHost   string
 	ApiScheme string
@@ -31,11 +32,12 @@ type githubRepository struct {
 	name   string
 }
 
-func NewGithubScrapper(cfg *config.GithubConfig, logger *slog.Logger) *GithubScrapper {
+func NewGithubScrapper(cfg *config.HTTPConfig, cbCfg *config.CircuitBreakerConfig, token string, logger *slog.Logger) *GithubScrapper {
 	return &GithubScrapper{
-		token:     cfg.Token,
+		httpCfg:   cfg,
+		token:     token,
 		logger:    logger,
-		Client:    http.Client{Timeout: cfg.Timeout},
+		Client:    utils.NewRetryClient(utils.NewCircuitBreakerClient(&http.Client{Timeout: cfg.Timeout}, cbCfg, logger), cfg, logger),
 		ApiHost:   "api.github.com",
 		ApiScheme: "https",
 	}
@@ -66,10 +68,7 @@ func (s *GithubScrapper) makeRequest(url string) (*http.Response, error) {
 
 	resp, err := s.Client.Do(req)
 	if err != nil {
-		if utils.IsNetError(err) {
-			return nil, uerrors.ErrAPIUnavailable
-		}
-		return nil, uerrors.ErrBadURL
+		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {

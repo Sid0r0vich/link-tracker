@@ -44,13 +44,14 @@ func (d TransportProtocol) IsValid() bool {
 type UpdateCommunicationType string
 
 const (
-	UpdateCommunicationTypeKafka UpdateCommunicationType = "kafka"
-	UpdateCommunicationTypeHTTP  UpdateCommunicationType = "HTTP"
+	UpdateCommunicationTypeKafka    UpdateCommunicationType = "kafka"
+	UpdateCommunicationTypeHTTP     UpdateCommunicationType = "HTTP"
+	UpdateCommunicationTypeFallback UpdateCommunicationType = "fallback"
 )
 
 func (d UpdateCommunicationType) IsValid() bool {
 	switch d {
-	case UpdateCommunicationTypeKafka, UpdateCommunicationTypeHTTP:
+	case UpdateCommunicationTypeKafka, UpdateCommunicationTypeHTTP, UpdateCommunicationTypeFallback:
 		return true
 	default:
 		return false
@@ -58,13 +59,13 @@ func (d UpdateCommunicationType) IsValid() bool {
 }
 
 type Config struct {
-	Database DatabaseConfig `mapstructure:"database"`
-	Bot      BotConfig      `mapstructure:"bot"`
-	Scrapper ScrapperConfig `mapstructure:"scrapper"`
-	Kafka    KafkaConfig    `mapstructure:"kafka"`
-	ValKey   ValKeyConfig   `mapstructure:"valkey"`
-
-	DefaultHTTPClientTimeout time.Duration `mapstructure:"default_http_client_timeout"`
+	Database       DatabaseConfig       `mapstructure:"database"`
+	Bot            BotConfig            `mapstructure:"bot"`
+	Scrapper       ScrapperConfig       `mapstructure:"scrapper"`
+	Kafka          KafkaConfig          `mapstructure:"kafka"`
+	ValKey         ValKeyConfig         `mapstructure:"valkey"`
+	HTTP           HTTPConfig           `mapstructure:"http"`
+	CircuitBreaker CircuitBreakerConfig `mapstructure:"circuit_breaker"`
 }
 
 type DatabaseConfig struct {
@@ -88,8 +89,8 @@ type BotConfig struct {
 
 type ScrapperConfig struct {
 	ServerAddr              string                  `mapstructure:"server_addr"`
-	Github                  GithubConfig            `mapstructure:"github"`
-	Stackoverflow           StackoverflowConfig     `mapstructure:"stackoverflow"`
+	GithubToken             string                  `mapstructure:"github_token"`
+	StackoverflowKey        string                  `mapstructure:"stackoverflow_key"`
 	DBAccessType            DBAccessType            `mapstructure:"db_access_type"`
 	TransportProtocol       TransportProtocol       `mapstructure:"transport_protocol"`
 	JobDelayInterval        time.Duration           `mapstructure:"job_delay_interval"`
@@ -97,16 +98,6 @@ type ScrapperConfig struct {
 	CacheEnabled            bool                    `mapstructure:"cache_enabled"`
 	UrlValidationEnabled    bool                    `mapstructure:"url_validation_enabled"`
 	OldUpdatesEnabled       bool                    `mapstructure:"old_updates_enabled"`
-}
-
-type GithubConfig struct {
-	Token   string        `mapstructure:"token"`
-	Timeout time.Duration `mapstructure:"timeout"`
-}
-
-type StackoverflowConfig struct {
-	Key     string        `mapstructure:"key"`
-	Timeout time.Duration `mapstructure:"timeout"`
 }
 
 type KafkaConfig struct {
@@ -123,6 +114,24 @@ type ValKeyConfig struct {
 	User           string        `mapstructure:"user"`
 	Password       string        `mapstructure:"password"`
 	ExpirationTime time.Duration `mapstructure:"expiration_time"`
+}
+
+type HTTPConfig struct {
+	Timeout            time.Duration `mapstructure:"timeout"`
+	RateLimit          int           `mapstructure:"rate_limit"`
+	RateLimitInterval  time.Duration `mapstructure:"rate_limit_interval"`
+	RetryCount         uint          `mapstructure:"retry_count"`
+	RetryDelay         time.Duration `mapstructure:"retry_delay"`
+	RetryableHTTPCodes []int         `mapstructure:"retryable_http_codes"`
+}
+
+type CircuitBreakerConfig struct {
+	SlidingWindowSize        time.Duration `mapstructure:"sliding_window_size"`
+	SlidingWindowBucketSize  time.Duration `mapstructure:"sliding_window_bucket_size"`
+	MinimumRequiredCalls     uint32        `mapstructure:"minimum_required_calls"`
+	FailureRateThreshold     float64       `mapstructure:"failure_rate_threshold"`
+	PermittedCallsInHalfOpen uint32        `mapstructure:"permitted_calls_in_half_open_state"`
+	WaitDurationInOpenState  time.Duration `mapstructure:"wait_duration_in_open_state"`
 }
 
 func LoadConfig(logger *slog.Logger) (*Config, error) {
