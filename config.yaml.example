@@ -1,9 +1,6 @@
 database:
   host: db
   port: 5432
-  username: postgres
-  password: pwd
-  name: link-tracker
   max_conns: 8
   min_conns: 2
   max_conn_idle_time_mins: 5
@@ -11,18 +8,15 @@ database:
   subscription_batch_size: 100
 
 bot:
-  token: # введите ваш токен телеграм бота
   server_addr: link-tracker-bot:1235
   cache_enabled: true
 
 scrapper:
   server_addr: link-tracker-scrapper:1234
-  db_access_type: SQL
-  transport_protocol: HTTP
-  job_delay_interval: 30s
   update_communication_type: kafka
   cache_enabled: true
   url_validation_enabled: true
+  old_updates_enabled: false
 
 kafka:
   brokers:

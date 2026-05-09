@@ -94,6 +94,7 @@ type ScrapperConfig struct {
 	UpdateCommunicationType UpdateCommunicationType `mapstructure:"update_communication_type"`
 	CacheEnabled            bool                    `mapstructure:"cache_enabled"`
 	UrlValidationEnabled    bool                    `mapstructure:"url_validation_enabled"`
+	OldUpdatesEnabled       bool                    `mapstructure:"old_updates_enabled"`
 }
 
 type KafkaConfig struct {
@@ -138,6 +139,12 @@ func newConfigFromFile(name string) (*Config, error) {
 
 	v.BindEnv("valkey.user", "VALKEY_USER")
 	v.BindEnv("valkey.password", "VALKEY_PASSWORD")
+
+	v.BindEnv("bot.token", "BOT_TOKEN")
+
+	v.BindEnv("scrapper.db_access_type", "SCRAPPER_DB_ACCESS_TYPE")
+	v.BindEnv("scrapper.transport_protocol", "SCRAPPER_TRANSPORT_PROTOCOL")
+	v.BindEnv("scrapper.job_delay_interval", "SCRAPPER_JOB_DELAY_INTERVAL")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config file: %w", err)

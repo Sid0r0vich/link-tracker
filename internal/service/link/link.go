@@ -30,7 +30,7 @@ type LinkServiceImpl struct {
 	scrapper               scrapper.Scrapper
 	clientCacheInvalidator cache.Invalidator
 	logger                 *slog.Logger
-	urlCheckEnabled        bool
+	cfg                    *config.ScrapperConfig
 }
 
 func NewLinkService(
@@ -45,7 +45,7 @@ func NewLinkService(
 		scrapper:               scrapper,
 		clientCacheInvalidator: clientCacheInvalidator,
 		logger:                 logger,
-		urlCheckEnabled:        cfg.Scrapper.UrlValidationEnabled,
+		cfg:                    &cfg.Scrapper,
 	}
 }
 
@@ -66,7 +66,7 @@ func (s *LinkServiceImpl) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 }
 
 func (s *LinkServiceImpl) AddLink(chatID int64, link domain.Link) (int64, error) {
-	if s.urlCheckEnabled {
+	if s.cfg.UrlValidationEnabled {
 		if err := utils.CheckUrl(link.URL); err != nil {
 			fmt.Fprint(os.Stderr, "BAD URL!")
 			return 0, uerrors.ErrBadURL
@@ -80,7 +80,9 @@ func (s *LinkServiceImpl) AddLink(chatID int64, link domain.Link) (int64, error)
 		link.UpdatedAt = update.UpdatedAt
 	}
 
-	link.UpdatedAt = time.Time{} // тест, сервис возвращает не актуальные, а все обновления
+	if s.cfg.OldUpdatesEnabled {
+		link.UpdatedAt = time.Time{}
+	}
 
 	id, err := s.linkRepo.AddLink(chatID, link)
 	if err != nil {
