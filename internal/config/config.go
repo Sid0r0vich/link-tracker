@@ -63,6 +63,8 @@ type Config struct {
 	Scrapper ScrapperConfig `mapstructure:"scrapper"`
 	Kafka    KafkaConfig    `mapstructure:"kafka"`
 	ValKey   ValKeyConfig   `mapstructure:"valkey"`
+
+	DefaultHTTPClientTimeout time.Duration `mapstructure:"default_http_client_timeout"`
 }
 
 type DatabaseConfig struct {
@@ -86,8 +88,8 @@ type BotConfig struct {
 
 type ScrapperConfig struct {
 	ServerAddr              string                  `mapstructure:"server_addr"`
-	GithubToken             string                  `mapstructure:"github_token"`
-	StackoverflowKey        string                  `mapstructure:"stackoverflow_key"`
+	Github                  GithubConfig            `mapstructure:"github"`
+	Stackoverflow           StackoverflowConfig     `mapstructure:"stackoverflow"`
 	DBAccessType            DBAccessType            `mapstructure:"db_access_type"`
 	TransportProtocol       TransportProtocol       `mapstructure:"transport_protocol"`
 	JobDelayInterval        time.Duration           `mapstructure:"job_delay_interval"`
@@ -95,6 +97,16 @@ type ScrapperConfig struct {
 	CacheEnabled            bool                    `mapstructure:"cache_enabled"`
 	UrlValidationEnabled    bool                    `mapstructure:"url_validation_enabled"`
 	OldUpdatesEnabled       bool                    `mapstructure:"old_updates_enabled"`
+}
+
+type GithubConfig struct {
+	Token   string        `mapstructure:"token"`
+	Timeout time.Duration `mapstructure:"timeout"`
+}
+
+type StackoverflowConfig struct {
+	Key     string        `mapstructure:"key"`
+	Timeout time.Duration `mapstructure:"timeout"`
 }
 
 type KafkaConfig struct {

@@ -172,7 +172,9 @@ func (s *ApiTestSuite) SetupSuite() {
 		Scrapper: config.ScrapperConfig{
 			JobDelayInterval:     1 * time.Second,
 			UrlValidationEnabled: true,
+			OldUpdatesEnabled:    true,
 		},
+		DefaultHTTPClientTimeout: time.Second * 5,
 	}
 
 	var err error
@@ -185,7 +187,7 @@ func (s *ApiTestSuite) SetupSuite() {
 	s.logger = logs.NewLogger()
 
 	s.stackoverflowMockApi = scrapperMocks.NewMockStackoverflowAPI(s.T(), stackoverflowTestPath, time.Now().Unix(), time.Now().Unix(), "test body")
-	stackOverflowScrapper := scrapper.NewStackoverflowScrapper(s.cfg.Scrapper.StackoverflowKey)
+	stackOverflowScrapper := scrapper.NewStackoverflowScrapper(&s.cfg.Scrapper.Stackoverflow)
 	stackOverflowScrapper.ApiHost = s.stackoverflowMockApi.Listener.Addr().String()
 	stackOverflowScrapper.ApiScheme = "http"
 	s.scrapperService = scrapper.NewScrapperService(map[string]scrapper.Scrapper{
@@ -280,7 +282,7 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperSqlRepositoryRestUpdater() {
 	stateRepo := stateRepository.NewInMemoryStateRepo()
 	ctrl := gomock.NewController(s.T())
 	mockBotApi := chatMocks.NewMockBotApi(ctrl)
-	chatController, err := chat.NewChatController(mockBotApi, scrapperRestAdapter, stateRepo, s.logger)
+	chatController, err := chat.NewChatController(s.cfg, mockBotApi, scrapperRestAdapter, stateRepo, s.logger)
 	s.Require().NoError(err)
 
 	deliveryService := delivery.NewDeliveryService(chatController)
@@ -337,7 +339,7 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperOrmRepositoryKafkaUpdater() {
 	stateRepo := stateRepository.NewInMemoryStateRepo()
 	ctrl := gomock.NewController(s.T())
 	mockBotApi := chatMocks.NewMockBotApi(ctrl)
-	chatController, err := chat.NewChatController(mockBotApi, scrapperRpcAdapter, stateRepo, s.logger)
+	chatController, err := chat.NewChatController(s.cfg, mockBotApi, scrapperRpcAdapter, stateRepo, s.logger)
 	s.Require().NoError(err)
 
 	deliveryService := delivery.NewDeliveryService(chatController)

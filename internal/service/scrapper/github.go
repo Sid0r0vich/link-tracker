@@ -10,17 +10,18 @@ import (
 	"strings"
 	"time"
 
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/utils"
 )
 
 type GithubScrapper struct {
-	Token     string
+	token     string
 	Client    http.Client
-	Logger    *slog.Logger
-	apiHost   string
-	apiScheme string
+	logger    *slog.Logger
+	ApiHost   string
+	ApiScheme string
 	urlHost   string
 	urlScheme string
 }
@@ -30,13 +31,13 @@ type githubRepository struct {
 	name   string
 }
 
-func NewGithubScrapper(token string, logger *slog.Logger) *GithubScrapper {
+func NewGithubScrapper(cfg *config.GithubConfig, logger *slog.Logger) *GithubScrapper {
 	return &GithubScrapper{
-		Token:     token,
-		Logger:    logger,
-		Client:    http.Client{Timeout: 5 * time.Second},
-		apiHost:   "api.github.com",
-		apiScheme: "https",
+		token:     cfg.Token,
+		logger:    logger,
+		Client:    http.Client{Timeout: cfg.Timeout},
+		ApiHost:   "api.github.com",
+		ApiScheme: "https",
 	}
 }
 
@@ -59,8 +60,8 @@ func (s *GithubScrapper) makeRequest(url string) (*http.Response, error) {
 		return nil, uerrors.ErrBadURL
 	}
 
-	if s.Token != "" {
-		req.Header.Set("Authorization", "token "+s.Token)
+	if s.token != "" {
+		req.Header.Set("Authorization", "token "+s.token)
 	}
 
 	resp, err := s.Client.Do(req)
@@ -89,7 +90,7 @@ func (s *GithubScrapper) GetUpdate(url string) (*domain.Update, error) {
 		return nil, fmt.Errorf("get repository: %v, %w", err, uerrors.ErrBadURL)
 	}
 
-	repoUrl := fmt.Sprintf("%s://%s/repos/%s/%s", s.apiScheme, s.apiHost, repo.author, repo.name)
+	repoUrl := fmt.Sprintf("%s://%s/repos/%s/%s", s.ApiScheme, s.ApiHost, repo.author, repo.name)
 	resp, err := s.makeRequest(repoUrl)
 	if err != nil {
 		return nil, err
@@ -119,7 +120,7 @@ func (s *GithubScrapper) GetUpdate(url string) (*domain.Update, error) {
 
 	updatedAt := time.Time{}
 	for _, pl := range allEvents {
-		s.Logger.Info("event request update time", "url", url, "created_at", pl.CreatedAt)
+		s.logger.Info("event request update time", "url", url, "created_at", pl.CreatedAt)
 		if pl.CreatedAt.After(updatedAt) {
 			updatedAt = pl.CreatedAt
 		}
@@ -173,10 +174,10 @@ func (s *GithubScrapper) getEvents(repo *githubRepository, typ string) ([]domain
 	var humanType string
 	switch typ {
 	case "pulls":
-		url = fmt.Sprintf("%s://%s/repos/%s/%s/pulls", s.apiScheme, s.apiHost, repo.author, repo.name)
+		url = fmt.Sprintf("%s://%s/repos/%s/%s/pulls", s.ApiScheme, s.ApiHost, repo.author, repo.name)
 		humanType = "pull request"
 	case "issues":
-		url = fmt.Sprintf("%s://%s/repos/%s/%s/issues", s.apiScheme, s.apiHost, repo.author, repo.name)
+		url = fmt.Sprintf("%s://%s/repos/%s/%s/issues", s.ApiScheme, s.ApiHost, repo.author, repo.name)
 		humanType = "issue"
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", typ)
@@ -201,7 +202,7 @@ func (s *GithubScrapper) getEvents(repo *githubRepository, typ string) ([]domain
 			CreatedAt:   pl.CreatedAt,
 			Title:       pl.Title,
 			Username:    pl.User.Login,
-			Description: utils.CutDescription(pl.Description, maxDescriptionLength),
+			Description: utils.CutDescription(pl.Description, MaxDescriptionLength),
 		})
 	}
 

@@ -68,6 +68,20 @@ func (mr *MockAPIMockRecorder) AddLink(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddLink", reflect.TypeOf((*MockAPI)(nil).AddLink), arg0)
 }
 
+// CheckUrl mocks base method.
+func (m *MockAPI) CheckUrl(arg0 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CheckUrl", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CheckUrl indicates an expected call of CheckUrl.
+func (mr *MockAPIMockRecorder) CheckUrl(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckUrl", reflect.TypeOf((*MockAPI)(nil).CheckUrl), arg0)
+}
+
 // DeleteChat mocks base method.
 func (m *MockAPI) DeleteChat(arg0 int64) error {
 	m.ctrl.T.Helper()

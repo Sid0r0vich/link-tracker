@@ -110,6 +110,7 @@ func TestHandleMessage(t *testing.T) {
 
 		msg := plainMessage("not-a-url")
 		mockAPI := mocks.NewMockAPI(ctrl)
+		mockAPI.EXPECT().CheckUrl("not-a-url").Return(errors.New("bad url"))
 		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkTrack}, nil)
 		mockAPI.EXPECT().Send(int64(0), "Некорректная ссылка")
 
@@ -129,6 +130,7 @@ func TestHandleMessage(t *testing.T) {
 
 		msg := plainMessage(ts.URL)
 		mockAPI := mocks.NewMockAPI(ctrl)
+		mockAPI.EXPECT().CheckUrl(ts.URL).Return(nil)
 		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkTrack}, nil)
 		mockAPI.EXPECT().SetTrackLink(int64(0), ts.URL).Return(nil)
 		mockAPI.EXPECT().Send(int64(0), "Введите теги:")
@@ -149,6 +151,7 @@ func TestHandleMessage(t *testing.T) {
 
 		msg := plainMessage(ts.URL)
 		mockAPI := mocks.NewMockAPI(ctrl)
+		mockAPI.EXPECT().CheckUrl(ts.URL).Return(nil)
 		setErr := errors.New("set track link failed")
 		mockAPI.EXPECT().GetData(int64(0)).Return(domain.ChatSimpleData{State: domain.LinkTrack}, nil)
 		mockAPI.EXPECT().SetTrackLink(int64(0), ts.URL).Return(setErr)

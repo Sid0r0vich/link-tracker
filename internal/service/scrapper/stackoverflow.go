@@ -9,22 +9,23 @@ import (
 	"strings"
 	"time"
 
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/utils"
 )
 
 type StackoverflowScrapper struct {
-	Key       string
+	key       string
 	Client    http.Client
 	ApiHost   string
 	ApiScheme string
 }
 
-func NewStackoverflowScrapper(key string) *StackoverflowScrapper {
+func NewStackoverflowScrapper(cfg *config.StackoverflowConfig) *StackoverflowScrapper {
 	return &StackoverflowScrapper{
-		Key:       key,
-		Client:    http.Client{Timeout: 5 * time.Second},
+		key:       cfg.Key,
+		Client:    http.Client{Timeout: cfg.Timeout},
 		ApiHost:   "api.stackexchange.com",
 		ApiScheme: "https",
 	}
@@ -39,8 +40,8 @@ func (s *StackoverflowScrapper) makeRequest(rurl string) (*http.Response, error)
 	params := url.Values{}
 	params.Add("site", "stackoverflow")
 	params.Add("filter", "withbody")
-	if s.Key != "" {
-		params.Add("key", s.Key)
+	if s.key != "" {
+		params.Add("key", s.key)
 	}
 	parsedUrl.RawQuery = params.Encode()
 	newUrl := parsedUrl.String()
@@ -204,7 +205,7 @@ func (s *StackoverflowScrapper) getEvents(questionID string, typ string, title s
 			CreatedAt:   time.Unix(answer.CreationDate, 0),
 			Title:       title,
 			Username:    answer.Owner.DisplayName,
-			Description: utils.CutDescription(answer.Content, maxDescriptionLength),
+			Description: utils.CutDescription(answer.Content, MaxDescriptionLength),
 		})
 	}
 

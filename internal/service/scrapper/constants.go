@@ -1,3 +1,3 @@
 package scrapper
 
-const maxDescriptionLength = 200
+const MaxDescriptionLength = 200

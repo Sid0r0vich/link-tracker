@@ -1,4 +1,4 @@
-package scrapper
+package scrapper_test
 
 import (
 	"strings"
@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/scrapper"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/scrapper/mocks"
 	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
@@ -16,13 +18,13 @@ func TestStackoverflowScrapper_GetUpdate_NewAnswerFormatsEvent(t *testing.T) {
 
 	creationDate := time.Now().Unix()
 	lastActivity := time.Now().Unix()
-	body := strings.Repeat("b", maxDescriptionLength+10)
+	body := strings.Repeat("b", scrapper.MaxDescriptionLength+10)
 	url := "/questions/1"
 
 	ts := mocks.NewMockStackoverflowAPI(t, url, creationDate, lastActivity, body)
 	defer ts.Close()
 
-	s := NewStackoverflowScrapper("test-key")
+	s := scrapper.NewStackoverflowScrapper(&config.StackoverflowConfig{Key: "test-key"})
 	s.ApiScheme = "http"
 	s.ApiHost = ts.Listener.Addr().String()
 	s.Client = *ts.Client()
@@ -38,7 +40,7 @@ func TestStackoverflowScrapper_GetUpdate_NewAnswerFormatsEvent(t *testing.T) {
 	expectedEvent := api.Event{
 		Type:        "answer",
 		Title:       "title",
-		Description: strings.Repeat("b", maxDescriptionLength),
+		Description: strings.Repeat("b", scrapper.MaxDescriptionLength),
 		Username:    "name",
 		CreatedAt:   time.Unix(creationDate, 0),
 	}

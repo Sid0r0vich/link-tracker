@@ -12,13 +12,13 @@ import (
 	"go.uber.org/fx"
 )
 
-func CheckUrl(url string) error {
+func CheckUrl(url string, timeout time.Duration) error {
 	req, err := http.NewRequest("Get", url, nil)
 	if err != nil {
 		return fmt.Errorf("making request to bot: %w", err)
 	}
 
-	client := http.Client{Timeout: time.Second * 10}
+	client := http.Client{Timeout: timeout}
 
 	resp, err := client.Do(req)
 	if err != nil {

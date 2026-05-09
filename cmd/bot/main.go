@@ -139,7 +139,7 @@ func NewApp() *fx.App {
 					logger.Error("failed to create bot", "error", err)
 					return nil, err
 				}
-				return chat.NewChatController(api, scrapperAdapter, stateRepo, logger)
+				return chat.NewChatController(cfg, api, scrapperAdapter, stateRepo, logger)
 			},
 			func(b *chat.ChatController) bot.API {
 				return b

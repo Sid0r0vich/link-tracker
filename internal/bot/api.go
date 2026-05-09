@@ -23,4 +23,5 @@ type API interface {
 	DeleteLink(int64) error
 	LogError(error)
 	Wait(int64) error
+	CheckUrl(string) error
 }

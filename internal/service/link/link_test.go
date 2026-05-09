@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/cache"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
@@ -17,7 +18,7 @@ import (
 )
 
 var (
-	cfg = &config.Config{Scrapper: config.ScrapperConfig{UrlValidationEnabled: true}}
+	cfg = &config.Config{Scrapper: config.ScrapperConfig{UrlValidationEnabled: true, OldUpdatesEnabled: true}}
 )
 
 func TestLinkService_AddChat(t *testing.T) {
@@ -109,15 +110,10 @@ func TestLinkService_AddLink_SetsZeroUpdatedAtBeforeRepository(t *testing.T) {
 
 	scr.EXPECT().GetUpdate(input.URL).Return(&domain.Update{UpdatedAt: updatedAt}, nil)
 	repo.EXPECT().AddLink(chatID, gomock.Any()).DoAndReturn(func(_ int64, got domain.Link) (int64, error) {
-		if !got.UpdatedAt.IsZero() {
-			t.Fatalf("expected zero UpdatedAt, got %v", got.UpdatedAt)
-		}
-		if got.URL != input.URL {
-			t.Fatalf("unexpected URL: %q", got.URL)
-		}
-		if len(got.Tags) != 1 || got.Tags[0] != "go" {
-			t.Fatalf("unexpected tags: %+v", got.Tags)
-		}
+		assert.True(t, got.UpdatedAt.IsZero())
+		assert.Equal(t, input.URL, got.URL)
+		require.Equal(t, 1, len(got.Tags))
+		assert.Equal(t, "go", got.Tags[0])
 		return linkID, nil
 	})
 

@@ -8,7 +8,6 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/utils"
 )
 
 type messageHandlerFunc = func(API, *tgbotapi.Message)
@@ -34,7 +33,7 @@ var StateToHandler = map[domain.ChatState]MessageHandler{
 		bot.Send(msg.Chat.ID, "Зайдите в меню, чтобы отправить команду")
 	}},
 	domain.LinkTrack: {Fun: func(bot API, msg *tgbotapi.Message) {
-		if err := utils.CheckUrl(msg.Text); err != nil {
+		if err := bot.CheckUrl(msg.Text); err != nil {
 			bot.Send(msg.Chat.ID, "Некорректная ссылка")
 			return
 		}

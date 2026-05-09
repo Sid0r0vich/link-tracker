@@ -29,8 +29,8 @@ func NewScrapperService(scrappers map[string]Scrapper) *ScrapperService {
 
 func NewScrapper(cfg *config.Config, logger *slog.Logger) Scrapper {
 	return NewScrapperService(map[string]Scrapper{
-		"github.com":        NewGithubScrapper(cfg.Scrapper.GithubToken, logger),
-		"stackoverflow.com": NewStackoverflowScrapper(cfg.Scrapper.StackoverflowKey),
+		"github.com":        NewGithubScrapper(&cfg.Scrapper.Github, logger),
+		"stackoverflow.com": NewStackoverflowScrapper(&cfg.Scrapper.Stackoverflow),
 	})
 }
 

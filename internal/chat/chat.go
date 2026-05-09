@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/adapter/scrapper"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
 	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	state_repository "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/repository/state"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/utils"
 )
 
 //go:generate go run go.uber.org/mock/mockgen -source=chat.go -destination=mocks/mock.gen.go -package=mocks
@@ -27,12 +30,13 @@ type ChatController struct {
 	stateRepo       state_repository.StateRepository
 	logger          *slog.Logger
 	scrapperAdapter scrapper.ScrapperAdapter
+	clientTimeout   time.Duration
 }
 
-func NewChatController(botApi BotApi, scrapperAdapter scrapper.ScrapperAdapter, stateRepo state_repository.StateRepository, logger *slog.Logger) (*ChatController, error) {
+func NewChatController(cfg *config.Config, botApi BotApi, scrapperAdapter scrapper.ScrapperAdapter, stateRepo state_repository.StateRepository, logger *slog.Logger) (*ChatController, error) {
 	logger.Info("init chat controller")
 
-	return &ChatController{api: botApi, stateRepo: stateRepo, logger: logger, scrapperAdapter: scrapperAdapter}, nil
+	return &ChatController{api: botApi, stateRepo: stateRepo, logger: logger, scrapperAdapter: scrapperAdapter, clientTimeout: cfg.DefaultHTTPClientTimeout}, nil
 }
 
 func (b *ChatController) SetCommands(commands []tgbotapi.BotCommand) error {
@@ -213,4 +217,8 @@ func (b *ChatController) Wait(chatID int64) error {
 	}
 
 	return uerrors.ErrBotAlreadyWaiting
+}
+
+func (b *ChatController) CheckUrl(url string) error {
+	return utils.CheckUrl(url, b.clientTimeout)
 }

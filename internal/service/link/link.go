@@ -31,6 +31,7 @@ type LinkServiceImpl struct {
 	clientCacheInvalidator cache.Invalidator
 	logger                 *slog.Logger
 	cfg                    *config.ScrapperConfig
+	clientTimeout          time.Duration
 }
 
 func NewLinkService(
@@ -46,6 +47,7 @@ func NewLinkService(
 		clientCacheInvalidator: clientCacheInvalidator,
 		logger:                 logger,
 		cfg:                    &cfg.Scrapper,
+		clientTimeout:          cfg.DefaultHTTPClientTimeout,
 	}
 }
 
@@ -67,7 +69,7 @@ func (s *LinkServiceImpl) GetLinks(chatID int64) ([]domain.LinkWithID, error) {
 
 func (s *LinkServiceImpl) AddLink(chatID int64, link domain.Link) (int64, error) {
 	if s.cfg.UrlValidationEnabled {
-		if err := utils.CheckUrl(link.URL); err != nil {
+		if err := utils.CheckUrl(link.URL, s.clientTimeout); err != nil {
 			fmt.Fprint(os.Stderr, "BAD URL!")
 			return 0, uerrors.ErrBadURL
 		}

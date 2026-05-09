@@ -1,4 +1,4 @@
-package scrapper
+package scrapper_test
 
 import (
 	"io"
@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/scrapper"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/scrapper/mocks"
 	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
@@ -17,7 +19,7 @@ func TestGithubScrapper_GetUpdate_NewIssueFormatsEvent(t *testing.T) {
 	t.Parallel()
 
 	createdAt := time.Unix(0, 0).UTC()
-	body := strings.Repeat("b", maxDescriptionLength+10)
+	body := strings.Repeat("b", scrapper.MaxDescriptionLength+10)
 	url := "/acme/project"
 	serverUrl := "/repos" + url
 
@@ -25,9 +27,9 @@ func TestGithubScrapper_GetUpdate_NewIssueFormatsEvent(t *testing.T) {
 	defer ts.Close()
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	s := NewGithubScrapper("", logger)
-	s.apiScheme = "http"
-	s.apiHost = ts.Listener.Addr().String()
+	s := scrapper.NewGithubScrapper(&config.GithubConfig{}, logger)
+	s.ApiScheme = "http"
+	s.ApiHost = ts.Listener.Addr().String()
 	s.Client = *ts.Client()
 
 	updateUrl := "https://github.com" + url
@@ -41,7 +43,7 @@ func TestGithubScrapper_GetUpdate_NewIssueFormatsEvent(t *testing.T) {
 	expectedEvent := api.Event{
 		Type:        "issue",
 		Title:       "title",
-		Description: strings.Repeat("b", maxDescriptionLength),
+		Description: strings.Repeat("b", scrapper.MaxDescriptionLength),
 		Username:    "name",
 		CreatedAt:   createdAt,
 	}
