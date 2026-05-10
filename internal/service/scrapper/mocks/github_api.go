@@ -7,22 +7,33 @@ import (
 	"time"
 )
 
-func NewMockGithubAPI(t *testing.T, serverUrl string, createdAt time.Time, body string) *httptest.Server {
+func NewMockGithubAPI(t *testing.T, cfg *ApiConfig, createdAt time.Time) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case serverUrl:
+		case cfg.ServerUrl + cfg.TimeoutPath:
+			time.Sleep(cfg.Timeout)
 			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		case cfg.ServerUrl + cfg.FailPath:
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{}`))
+		case cfg.ServerUrl + cfg.OkPath:
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"description":"test repo"}`))
-		case serverUrl + "/pulls":
+		case cfg.ServerUrl + cfg.OkPath + "/pulls":
 			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[]`))
-		case serverUrl + "/issues":
+		case cfg.ServerUrl + cfg.OkPath + "/issues":
 			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[
 				{
 					"created_at":"` + createdAt.Format(time.RFC3339) + `",
 					"title":"title",
-					"body":"` + body + `",
+					"body":"` + cfg.Body + `",
 					"user":{"login":"name"}
 				}
 			]`))

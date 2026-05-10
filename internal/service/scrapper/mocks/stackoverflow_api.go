@@ -7,35 +7,47 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 )
 
-func NewMockStackoverflowAPI(t *testing.T, url string, creationDate, lastActivity int64, body string) *httptest.Server {
+func NewMockStackoverflowAPI(t *testing.T, cfg *ApiConfig, creationDate, lastActivity int64) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case url:
+		case cfg.ServerUrl + cfg.TimeoutPath:
+			time.Sleep(cfg.Timeout)
 			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		case cfg.ServerUrl + cfg.FailPath:
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{}`))
+		case cfg.ServerUrl + cfg.OkPath:
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{
 				"items":[
 					{"last_activity_date":` + int64ToString(lastActivity) + `,"title":"title"}
 				]
 			}`))
-		case url + "/answers":
+		case cfg.ServerUrl + cfg.OkPath + "/answers":
 			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{
 				"items":[
 					{
 						"last_activity_date":` + int64ToString(lastActivity) + `,
 						"creation_date":` + int64ToString(creationDate) + `,
 						"owner":{"display_name":"name"},
-						"body":"` + body + `"
+						"body":"` + cfg.Body + `"
 					}
 				]
 			}`))
-		case url + "/comments":
+		case cfg.ServerUrl + cfg.OkPath + "/comments":
 			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"items":[]}`))
 		default:
-			fmt.Fprintf(os.Stderr, "expected URL: %s.found URL: %s", url, r.URL.Path)
+			fmt.Fprintf(os.Stderr, "expected URL: %s.found URL: %s", cfg.ServerUrl, r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))

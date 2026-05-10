@@ -43,6 +43,7 @@ http:
   rate_limit_interval: 5s
   retry_count: 3
   retry_delay: 2s
+  retry_strategy: constant
   retryable_http_codes:
     - 500
 

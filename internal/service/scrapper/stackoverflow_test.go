@@ -1,31 +1,67 @@
 package scrapper_test
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain"
+	uerrors "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/errors"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/scrapper"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/service/scrapper/mocks"
 	api "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/api/bot/rest"
 )
 
-func TestStackoverflowScrapper_GetUpdate_NewAnswerFormatsEvent(t *testing.T) {
-	t.Parallel()
+type StackoverflowSuite struct {
+	suite.Suite
+	ts           *httptest.Server
+	cfg          *mocks.ApiConfig
+	cb           *config.CircuitBreakerConfig
+	creationDate int64
+	lastActivity int64
+}
 
-	creationDate := time.Now().Unix()
-	lastActivity := time.Now().Unix()
+func (s *StackoverflowSuite) SetupTest() {
+	s.creationDate = time.Now().Unix()
+	s.lastActivity = time.Now().Unix()
 	body := strings.Repeat("b", scrapper.MaxDescriptionLength+10)
-	url := "/questions/1"
 
-	ts := mocks.NewMockStackoverflowAPI(t, url, creationDate, lastActivity, body)
-	defer ts.Close()
+	s.cfg = &mocks.ApiConfig{
+		ServerUrl:   "/questions",
+		OkPath:      "/1",
+		TimeoutPath: "/timeout",
+		FailPath:    "/fail",
+		Body:        body,
+		Timeout:     time.Second,
+	}
+	s.cb = &config.CircuitBreakerConfig{
+		SlidingWindowSize:        time.Millisecond * 500,
+		SlidingWindowBucketSize:  time.Millisecond * 100,
+		MinimumRequiredCalls:     2,
+		FailureRateThreshold:     51,
+		PermittedCallsInHalfOpen: 4,
+		WaitDurationInOpenState:  time.Second,
+	}
+	s.ts = mocks.NewMockStackoverflowAPI(s.T(), s.cfg, s.creationDate, s.lastActivity)
+}
 
+func (s *StackoverflowSuite) TearDownTest() {
+	s.ts.Close()
+}
+
+func TestStackoverflowSuite(t *testing.T) {
+	suite.Run(t, new(StackoverflowSuite))
+}
+
+func (s *StackoverflowSuite) TestGetUpdate_NewAnswerFormatsEvent() {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	cb := &config.CircuitBreakerConfig{
 		SlidingWindowSize:        10,
@@ -34,17 +70,17 @@ func TestStackoverflowScrapper_GetUpdate_NewAnswerFormatsEvent(t *testing.T) {
 		PermittedCallsInHalfOpen: 1,
 		WaitDurationInOpenState:  1 * time.Second,
 	}
-	s := scrapper.NewStackoverflowScrapper(&config.HTTPConfig{Timeout: 5 * time.Second}, cb, "test-key", logger)
-	s.ApiScheme = "http"
-	s.ApiHost = ts.Listener.Addr().String()
-	s.Client = ts.Client()
+	scr := scrapper.NewStackoverflowScrapper(&config.HTTPConfig{Timeout: 5 * time.Second}, cb, "test-key", logger)
+	scr.ApiScheme = "http"
+	scr.ApiHost = s.ts.Listener.Addr().String()
+	scr.Client = s.ts.Client()
 
-	updateUrl := "https://stackoverflow.com" + url
-	upd, err := s.GetUpdate(updateUrl)
-	assert.NoError(t, err)
-	assert.NotNil(t, upd)
-	assert.Equal(t, updateUrl, upd.URL)
-	assert.Equal(t, 1, len(upd.Data))
+	updateUrl := "https://stackoverflow.com/questions/1"
+	upd, err := scr.GetUpdate(updateUrl)
+	s.NoError(err)
+	s.NotNil(upd)
+	s.Equal(updateUrl, upd.URL)
+	s.Equal(1, len(upd.Data))
 
 	event := upd.Data[0]
 	expectedEvent := api.Event{
@@ -52,8 +88,79 @@ func TestStackoverflowScrapper_GetUpdate_NewAnswerFormatsEvent(t *testing.T) {
 		Title:       "title",
 		Description: strings.Repeat("b", scrapper.MaxDescriptionLength),
 		Username:    "name",
-		CreatedAt:   time.Unix(creationDate, 0),
+		CreatedAt:   time.Unix(s.creationDate, 0),
 	}
 
-	assert.Equal(t, *domain.ApiEventToEvent(&expectedEvent), event)
+	s.Equal(*domain.ApiEventToEvent(&expectedEvent), event)
+}
+
+func (s *StackoverflowSuite) TestGetUpdate_Timeout() {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	cb := &config.CircuitBreakerConfig{
+		SlidingWindowSize:        10,
+		MinimumRequiredCalls:     1,
+		FailureRateThreshold:     100,
+		PermittedCallsInHalfOpen: 1,
+		WaitDurationInOpenState:  1 * time.Second,
+	}
+	scr := scrapper.NewStackoverflowScrapper(&config.HTTPConfig{Timeout: s.cfg.Timeout}, cb, "test-key", logger)
+	scr.ApiScheme = "http"
+	scr.ApiHost = s.ts.Listener.Addr().String()
+	scr.Client = s.ts.Client()
+
+	updateUrl := "https://stackoverflow.com/questions/timeout"
+	_, err := scr.GetUpdate(updateUrl)
+	s.Error(err)
+}
+
+func (s *StackoverflowSuite) TestCircuitBreaker() {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	scr := scrapper.NewStackoverflowScrapper(&config.HTTPConfig{Timeout: time.Millisecond, RetryCount: 1}, s.cb, "test-key", logger)
+	scr.ApiScheme = "http"
+	scr.ApiHost = s.ts.Listener.Addr().String()
+
+	baseUrl := "https://stackoverflow.com/questions"
+	timeoutUrl := baseUrl + s.cfg.TimeoutPath
+	okUrl := baseUrl + s.cfg.OkPath
+
+	// open
+	_, err := scr.GetUpdate(timeoutUrl)
+	s.True(errors.Is(err, uerrors.ErrAPIUnavailable))
+	_, err = scr.GetUpdate(timeoutUrl)
+	s.True(errors.Is(err, uerrors.ErrAPIUnavailable))
+	_, err = scr.GetUpdate(okUrl)
+	s.True(errors.Is(err, uerrors.ErrOpenState))
+
+	// half-open and recover
+	time.Sleep(s.cb.WaitDurationInOpenState * 2)
+	_, err = scr.GetUpdate(okUrl)
+	s.NoError(err)
+	_, err = scr.GetUpdate(okUrl)
+	s.NoError(err)
+
+	// still ok
+	_, err = scr.GetUpdate(timeoutUrl)
+	s.True(errors.Is(err, uerrors.ErrAPIUnavailable))
+	_, err = scr.GetUpdate(okUrl)
+	s.NoError(err)
+
+	// open again
+	time.Sleep(time.Second)
+	_, err = scr.GetUpdate(timeoutUrl)
+	s.True(errors.Is(err, uerrors.ErrAPIUnavailable))
+	_, err = scr.GetUpdate(timeoutUrl)
+	s.True(errors.Is(err, uerrors.ErrAPIUnavailable))
+	_, err = scr.GetUpdate(okUrl)
+	s.True(errors.Is(err, uerrors.ErrOpenState))
+
+	// half-open and fail
+	time.Sleep(s.cb.WaitDurationInOpenState * 2)
+	_, err = scr.GetUpdate(okUrl)
+	s.NoError(err)
+	_, err = scr.GetUpdate(timeoutUrl)
+	s.True(errors.Is(err, uerrors.ErrAPIUnavailable))
+	_, err = scr.GetUpdate(okUrl)
+	fmt.Fprintf(os.Stderr, "err: %v\n", err)
+	s.True(errors.Is(err, uerrors.ErrOpenState))
 }

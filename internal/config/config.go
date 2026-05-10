@@ -58,6 +58,22 @@ func (d UpdateCommunicationType) IsValid() bool {
 	}
 }
 
+type RetryStrategyType string
+
+const (
+	RetryStrategyConstant    RetryStrategyType = "constant"
+	RetryStrategyExponential RetryStrategyType = "exponential"
+)
+
+func (d RetryStrategyType) IsValid() bool {
+	switch d {
+	case RetryStrategyConstant, RetryStrategyExponential:
+		return true
+	default:
+		return false
+	}
+}
+
 type Config struct {
 	Database       DatabaseConfig       `mapstructure:"database"`
 	Bot            BotConfig            `mapstructure:"bot"`
@@ -117,12 +133,13 @@ type ValKeyConfig struct {
 }
 
 type HTTPConfig struct {
-	Timeout            time.Duration `mapstructure:"timeout"`
-	RateLimit          int           `mapstructure:"rate_limit"`
-	RateLimitInterval  time.Duration `mapstructure:"rate_limit_interval"`
-	RetryCount         uint          `mapstructure:"retry_count"`
-	RetryDelay         time.Duration `mapstructure:"retry_delay"`
-	RetryableHTTPCodes []int         `mapstructure:"retryable_http_codes"`
+	Timeout            time.Duration     `mapstructure:"timeout"`
+	RateLimit          int               `mapstructure:"rate_limit"`
+	RateLimitInterval  time.Duration     `mapstructure:"rate_limit_interval"`
+	RetryCount         uint              `mapstructure:"retry_count"`
+	RetryDelay         time.Duration     `mapstructure:"retry_delay"`
+	RetryableHTTPCodes []int             `mapstructure:"retryable_http_codes"`
+	RetryStrategy      RetryStrategyType `mapstructure:"retry_strategy"`
 }
 
 type CircuitBreakerConfig struct {
@@ -185,6 +202,10 @@ func newConfigFromFile(name string) (*Config, error) {
 
 	if !cfg.Scrapper.UpdateCommunicationType.IsValid() {
 		return nil, fmt.Errorf("invalid update communication type: %s", cfg.Scrapper.UpdateCommunicationType)
+	}
+
+	if !cfg.HTTP.RetryStrategy.IsValid() {
+		return nil, fmt.Errorf("invalid retry strategy: %s", cfg.HTTP.RetryStrategy)
 	}
 
 	return cfg, nil

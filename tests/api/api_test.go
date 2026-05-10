@@ -188,7 +188,13 @@ func (s *ApiTestSuite) SetupSuite() {
 
 	s.logger = logs.NewLogger()
 
-	s.stackoverflowMockApi = scrapperMocks.NewMockStackoverflowAPI(s.T(), stackoverflowTestPath, time.Now().Unix(), time.Now().Unix(), "test body")
+	s.stackoverflowMockApi = scrapperMocks.NewMockStackoverflowAPI(s.T(), &scrapperMocks.ApiConfig{
+		ServerUrl:   "/questions",
+		OkPath:      "/1",
+		TimeoutPath: "/timeout",
+		Body:        "test body",
+		Timeout:     time.Second,
+	}, time.Now().Unix(), time.Now().Unix())
 	stackOverflowScrapper := scrapper.NewStackoverflowScrapper(&s.cfg.HTTP, &s.cfg.CircuitBreaker, s.cfg.Scrapper.StackoverflowKey, s.logger)
 	stackOverflowScrapper.ApiHost = s.stackoverflowMockApi.Listener.Addr().String()
 	stackOverflowScrapper.ApiScheme = "http"
