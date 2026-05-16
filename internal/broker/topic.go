@@ -8,8 +8,8 @@ import (
 	"go.uber.org/thriftrw/ptr"
 )
 
-func CreateTopicIfNotExists(kafkaCfg *config.KafkaConfig, cfg *sarama.Config) error {
-	admin, err := sarama.NewClusterAdmin(kafkaCfg.Brokers, cfg)
+func CreateTopicIfNotExists(brokers []string, topic string, kafkaCfg *config.KafkaConfig, cfg *sarama.Config) error {
+	admin, err := sarama.NewClusterAdmin(brokers, cfg)
 	if err != nil {
 		return err
 	}
@@ -20,12 +20,12 @@ func CreateTopicIfNotExists(kafkaCfg *config.KafkaConfig, cfg *sarama.Config) er
 		return err
 	}
 
-	if _, exists := topics[kafkaCfg.Raw.Topic]; !exists {
+	if _, exists := topics[topic]; !exists {
 		err = admin.CreateTopic(
-			kafkaCfg.Raw.Topic,
+			topic,
 			&sarama.TopicDetail{
 				NumPartitions:     kafkaCfg.NumPartitions,
-				ReplicationFactor: int16(len(kafkaCfg.Brokers)),
+				ReplicationFactor: int16(len(brokers)),
 				ConfigEntries: map[string]*string{
 					"cleanup.policy":      ptr.String("delete"),
 					"retention.ms":        ptr.String(strconv.Itoa(kafkaCfg.RetentionMs)),

@@ -38,7 +38,7 @@ func startServer(cfg *config.Config, deliveryService *delivery.DeliveryService, 
 
 func startConsumer(ctx context.Context, cfg *config.Config, deliveryService *delivery.DeliveryService, logger *slog.Logger) error {
 	handler := brokerhandler.NewBotMessageHandler(deliveryService, logger)
-	return broker.StartConsumerGroup(ctx, broker.NewConfig(), logger, &cfg.Kafka, handler.Handle)
+	return broker.StartConsumerGroup(ctx, broker.NewConfig(), cfg.Kafka.Brokers, cfg.Kafka.Processed.Topic, cfg.Kafka.Processed.GroupID, logger, handler.Handle)
 }
 
 func run(ctx context.Context, cfg *config.Config, chatController *chat.ChatController, deliveryService *delivery.DeliveryService, logger *slog.Logger) error {

@@ -18,18 +18,19 @@ type UpdateBrokerService struct {
 
 func NewUpdateBrokerService(
 	ctx context.Context,
+	topic string,
 	cfg *config.KafkaConfig,
 	logger *slog.Logger,
 ) (*UpdateBrokerService, error) {
 	saramaCfg := broker.NewConfig()
-	if err := broker.CreateTopicIfNotExists(cfg, saramaCfg); err != nil {
-		return nil, fmt.Errorf("create kafka topic %q: %w", cfg.Raw.Topic, err)
+	if err := broker.CreateTopicIfNotExists(cfg.Brokers, topic, cfg, saramaCfg); err != nil {
+		return nil, fmt.Errorf("create kafka topic %q: %w", topic, err)
 	}
 	producer, err := broker.NewProducer(ctx, saramaCfg, logger, cfg.Brokers)
 	if err != nil {
 		return nil, fmt.Errorf("create update producer: %w", err)
 	}
-	return &UpdateBrokerService{producer: producer, topic: cfg.Raw.Topic}, nil
+	return &UpdateBrokerService{producer: producer, topic: topic}, nil
 }
 
 func (s *UpdateBrokerService) SendUpdate(data *domain.UpdateMessage) error {

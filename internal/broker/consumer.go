@@ -6,7 +6,6 @@ import (
 	"log/slog"
 
 	"github.com/IBM/sarama"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/config"
 )
 
 type consumerGroupHandler struct {
@@ -41,11 +40,13 @@ func (h *consumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, cl
 func StartConsumerGroup(
 	ctx context.Context,
 	cfg *sarama.Config,
+	brokers []string,
+	topic string,
+	groupID string,
 	logger *slog.Logger,
-	kafkaCfg *config.KafkaConfig,
 	handleFunc func(message *sarama.ConsumerMessage),
 ) error {
-	consumerGroup, err := sarama.NewConsumerGroup(kafkaCfg.Brokers, kafkaCfg.Raw.GroupID, cfg)
+	consumerGroup, err := sarama.NewConsumerGroup(brokers, groupID, cfg)
 	if err != nil {
 		return fmt.Errorf("create consumer group: %w", err)
 	}
@@ -53,7 +54,7 @@ func StartConsumerGroup(
 	handler := newConsumerGroupHandler(handleFunc)
 
 	for {
-		if err := consumerGroup.Consume(ctx, []string{kafkaCfg.Raw.Topic}, handler); err != nil {
+		if err := consumerGroup.Consume(ctx, []string{topic}, handler); err != nil {
 			logger.Error("error consuming messages", slog.Any("error", err))
 		}
 

@@ -167,6 +167,10 @@ func (s *ApiTestSuite) SetupSuite() {
 				Topic:   "link_updates",
 				GroupID: "1",
 			},
+			Processed: config.KafkaTopicConfig{
+				Topic:   "link_updates_processed",
+				GroupID: "2",
+			},
 			NumPartitions:     1,
 			RetentionMs:       60000,
 			MinInsyncReplicas: 1,
@@ -356,17 +360,51 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperOrmRepositoryKafkaUpdater() {
 	handler := brokerhandler.NewBotMessageHandler(deliveryService, s.logger)
 
 	consumerCtx, cancelConsumer := context.WithCancel(ctx)
-	updateBrokerService, err := update.NewUpdateBrokerService(consumerCtx, &s.cfg.Kafka, s.logger)
+	updateBrokerService, err := update.NewUpdateBrokerService(consumerCtx, s.cfg.Kafka.Raw.Topic, &s.cfg.Kafka, s.logger)
 	s.Require().NoError(err)
 
+	agentUpdateBrokerService, err := update.NewUpdateBrokerService(consumerCtx, s.cfg.Kafka.Processed.Topic, &s.cfg.Kafka, s.logger)
+	s.Require().NoError(err)
+
+	agentCtx, cancelAgent := context.WithCancel(consumerCtx)
+	s.T().Cleanup(cancelAgent)
+
+	var agentWG sync.WaitGroup
+	agentWG.Add(1)
+	go func() {
+		defer agentWG.Done()
+		agentHandler := brokerhandler.NewAgentMessageHandler(agentUpdateBrokerService, s.logger)
+		_ = broker.StartConsumerGroup(
+			agentCtx,
+			broker.NewConfig(),
+			s.cfg.Kafka.Brokers,
+			s.cfg.Kafka.Raw.Topic,
+			s.cfg.Kafka.Raw.GroupID,
+			s.logger,
+			agentHandler.Handle,
+		)
+	}()
+
 	var wg sync.WaitGroup
-	wg.Go(func() {
-		_ = broker.StartConsumerGroup(consumerCtx, broker.NewConfig(), s.logger, &s.cfg.Kafka, handler.Handle)
-	})
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_ = broker.StartConsumerGroup(
+			consumerCtx,
+			broker.NewConfig(),
+			s.cfg.Kafka.Brokers,
+			s.cfg.Kafka.Processed.Topic,
+			s.cfg.Kafka.Processed.GroupID,
+			s.logger,
+			handler.Handle,
+		)
+	}()
 
 	testApiAddLink(ctx, s.T(), ormRepo, updateBrokerService, s.scrapperService, stackoverflowTestUrl, chatController, mockBotApi, s.logger)
 
 	cancelConsumer()
+	cancelAgent()
+	agentWG.Wait()
 	wg.Wait()
 }
 

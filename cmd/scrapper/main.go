@@ -129,7 +129,7 @@ func NewApp() *fx.App {
 				logger *slog.Logger,
 			) (scheduler.Updater, error) {
 				updateRestService, errRest := update.NewUpdateRestService(fmt.Sprintf("http://%s", cfg.Bot.ServerAddr), &cfg.HTTP)
-				updateKafkaService, errKafka := update.NewUpdateBrokerService(ctx, &cfg.Kafka, logger)
+				updateKafkaService, errKafka := update.NewUpdateBrokerService(ctx, cfg.Kafka.Raw.Topic, &cfg.Kafka, logger)
 
 				switch cfg.Scrapper.UpdateCommunicationType {
 				case config.UpdateCommunicationTypeHTTP:

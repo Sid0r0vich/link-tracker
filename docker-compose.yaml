@@ -51,6 +51,8 @@ services:
     depends_on:
       scrapper:
         condition: service_healthy
+      agent:
+        condition: service_started
       kafka-1:
         condition: service_healthy
       kafka-2:
@@ -259,6 +261,25 @@ services:
       valkey-2:
         condition: service_healthy
       valkey-3:
+        condition: service_healthy
+
+  agent:
+    image: sid00r/link-tracker-agent:latest
+    build: 
+      context: .
+      dockerfile: ./docker/agent/Dockerfile
+    container_name: link-tracker-agent
+    env_file:
+      - .env
+    environment:
+      CONFIG_FILE: /config/config.yaml
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+    networks:
+      - markdown
+    restart: unless-stopped
+    depends_on:
+      scrapper:
         condition: service_healthy
 
 networks:

@@ -69,8 +69,8 @@ func (s *KafkaTestSuite) TestCreateTopicIfNotExists_Idempotent() {
 	}
 	clientCfg := broker.NewConfig()
 
-	require.NoError(s.T(), broker.CreateTopicIfNotExists(kafkaCfg, clientCfg))
-	require.NoError(s.T(), broker.CreateTopicIfNotExists(kafkaCfg, clientCfg))
+	require.NoError(s.T(), broker.CreateTopicIfNotExists(kafkaCfg.Brokers, kafkaCfg.Raw.Topic, kafkaCfg, clientCfg))
+	require.NoError(s.T(), broker.CreateTopicIfNotExists(kafkaCfg.Brokers, kafkaCfg.Raw.Topic, kafkaCfg, clientCfg))
 
 	admin, err := sarama.NewClusterAdmin(s.brokers, clientCfg)
 	require.NoError(s.T(), err)
@@ -102,7 +102,7 @@ func (s *KafkaTestSuite) TestStartConsumerGroup_ConsumesMessage() {
 	}
 	clientCfg := broker.NewConfig()
 	clientCfg.Consumer.Offsets.Initial = sarama.OffsetOldest
-	require.NoError(s.T(), broker.CreateTopicIfNotExists(kafkaCfg, clientCfg))
+	require.NoError(s.T(), broker.CreateTopicIfNotExists(kafkaCfg.Brokers, kafkaCfg.Raw.Topic, kafkaCfg, clientCfg))
 
 	consumerCtx, cancelConsumer := context.WithCancel(context.Background())
 	s.T().Cleanup(cancelConsumer)
@@ -115,14 +115,10 @@ func (s *KafkaTestSuite) TestStartConsumerGroup_ConsumesMessage() {
 		errCh <- broker.StartConsumerGroup(
 			consumerCtx,
 			clientCfg,
+			s.brokers,
+			topic,
+			groupID,
 			logger,
-			&config.KafkaConfig{
-				Raw: config.KafkaTopicConfig{
-					Topic:   topic,
-					GroupID: groupID,
-				},
-				Brokers: s.brokers,
-			},
 			func(message *sarama.ConsumerMessage) {
 				select {
 				case received <- message:
