@@ -82,6 +82,7 @@ type Config struct {
 	ValKey         ValKeyConfig         `mapstructure:"valkey"`
 	HTTP           HTTPConfig           `mapstructure:"http"`
 	CircuitBreaker CircuitBreakerConfig `mapstructure:"circuit_breaker"`
+	AIAgent        AIConfig             `mapstructure:"ai_agent"`
 }
 
 type DatabaseConfig struct {
@@ -117,12 +118,17 @@ type ScrapperConfig struct {
 }
 
 type KafkaConfig struct {
-	Brokers           []string `mapstructure:"brokers"`
-	Topic             string   `mapstructure:"topic"`
-	GroupID           string   `mapstructure:"group_id"`
-	NumPartitions     int32    `mapstructure:"num_partitions"`
-	RetentionMs       int      `mapstructure:"retention_ms"`
-	MinInsyncReplicas int      `mapstructure:"min_insync_replicas"`
+	Brokers           []string         `mapstructure:"brokers"`
+	Raw               KafkaTopicConfig `mapstructure:"raw"`
+	Processed         KafkaTopicConfig `mapstructure:"processed"`
+	NumPartitions     int32            `mapstructure:"num_partitions"`
+	RetentionMs       int              `mapstructure:"retention_ms"`
+	MinInsyncReplicas int              `mapstructure:"min_insync_replicas"`
+}
+
+type KafkaTopicConfig struct {
+	Topic   string `mapstructure:"topic"`
+	GroupID string `mapstructure:"group_id"`
 }
 
 type ValKeyConfig struct {
@@ -149,6 +155,21 @@ type CircuitBreakerConfig struct {
 	FailureRateThreshold     float64       `mapstructure:"failure_rate_threshold"`
 	PermittedCallsInHalfOpen uint32        `mapstructure:"permitted_calls_in_half_open_state"`
 	WaitDurationInOpenState  time.Duration `mapstructure:"wait_duration_in_open_state"`
+}
+
+type AIConfig struct {
+	Filtering     FilteringConfig     `mapstructure:"filtering"`
+	Summarization SummarizationConfig `mapstructure:"summarization"`
+}
+
+type FilteringConfig struct {
+	StopWords       []string `mapstructure:"stop_words"`
+	ExcludedAuthors []string `mapstructure:"excluded_authors"`
+	MinLength       int      `mapstructure:"min_length"`
+}
+
+type SummarizationConfig struct {
+	Threshold int `mapstructure:"threshold"`
 }
 
 func LoadConfig(logger *slog.Logger) (*Config, error) {

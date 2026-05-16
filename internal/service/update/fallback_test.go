@@ -61,7 +61,7 @@ func TestUpdateFallbackServiceSendUpdateUsesBrokerOnRestTimeout(t *testing.T) {
 	assert.Contains(t, logBuffer.String(), restErr.Error())
 }
 
-func TestUpdateFallbackService_SendUpdate_ReturnsBothErrorsWhenBrokerFails(t *testing.T) {
+func TestUpdateFallbackServiceSendUpdateReturnsBothErrorsWhenBrokerFails(t *testing.T) {
 	t.Parallel()
 
 	restErr := context.DeadlineExceeded

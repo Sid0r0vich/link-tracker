@@ -58,8 +58,11 @@ func (s *KafkaTestSuite) TestCreateTopicIfNotExists_Idempotent() {
 	topic := s.newTopicName("links")
 
 	kafkaCfg := &config.KafkaConfig{
+		Raw: config.KafkaTopicConfig{
+			Topic:   topic,
+			GroupID: "test-group",
+		},
 		Brokers:           s.brokers,
-		Topic:             topic,
 		NumPartitions:     1,
 		RetentionMs:       60000,
 		MinInsyncReplicas: 1,
@@ -88,8 +91,11 @@ func (s *KafkaTestSuite) TestStartConsumerGroup_ConsumesMessage() {
 	payload := []byte("integration-message")
 
 	kafkaCfg := &config.KafkaConfig{
+		Raw: config.KafkaTopicConfig{
+			Topic:   topic,
+			GroupID: groupID,
+		},
 		Brokers:           s.brokers,
-		Topic:             topic,
 		NumPartitions:     1,
 		RetentionMs:       60000,
 		MinInsyncReplicas: 1,
@@ -111,9 +117,11 @@ func (s *KafkaTestSuite) TestStartConsumerGroup_ConsumesMessage() {
 			clientCfg,
 			logger,
 			&config.KafkaConfig{
+				Raw: config.KafkaTopicConfig{
+					Topic:   topic,
+					GroupID: groupID,
+				},
 				Brokers: s.brokers,
-				GroupID: groupID,
-				Topic:   topic,
 			},
 			func(message *sarama.ConsumerMessage) {
 				select {

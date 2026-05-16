@@ -45,7 +45,7 @@ func StartConsumerGroup(
 	kafkaCfg *config.KafkaConfig,
 	handleFunc func(message *sarama.ConsumerMessage),
 ) error {
-	consumerGroup, err := sarama.NewConsumerGroup(kafkaCfg.Brokers, kafkaCfg.GroupID, cfg)
+	consumerGroup, err := sarama.NewConsumerGroup(kafkaCfg.Brokers, kafkaCfg.Raw.GroupID, cfg)
 	if err != nil {
 		return fmt.Errorf("create consumer group: %w", err)
 	}
@@ -53,7 +53,7 @@ func StartConsumerGroup(
 	handler := newConsumerGroupHandler(handleFunc)
 
 	for {
-		if err := consumerGroup.Consume(ctx, []string{kafkaCfg.Topic}, handler); err != nil {
+		if err := consumerGroup.Consume(ctx, []string{kafkaCfg.Raw.Topic}, handler); err != nil {
 			logger.Error("error consuming messages", slog.Any("error", err))
 		}
 

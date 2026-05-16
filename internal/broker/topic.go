@@ -20,9 +20,9 @@ func CreateTopicIfNotExists(kafkaCfg *config.KafkaConfig, cfg *sarama.Config) er
 		return err
 	}
 
-	if _, exists := topics[kafkaCfg.Topic]; !exists {
+	if _, exists := topics[kafkaCfg.Raw.Topic]; !exists {
 		err = admin.CreateTopic(
-			kafkaCfg.Topic,
+			kafkaCfg.Raw.Topic,
 			&sarama.TopicDetail{
 				NumPartitions:     kafkaCfg.NumPartitions,
 				ReplicationFactor: int16(len(kafkaCfg.Brokers)),

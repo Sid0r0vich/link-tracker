@@ -23,8 +23,12 @@ kafka:
     - kafka-1:9094
     - kafka-2:9094
     - kafka-3:9094
-  topic: updates
-  group_id: 1
+  raw:
+    topic: link.raw-updates
+    group_id: 1
+  processed:
+    topic: link.processed-updates
+    group_id: 2
   num_partitions: 1
   retention_ms: 86400000
   min_insync_replicas: 2
@@ -54,3 +58,15 @@ circuit_breaker:
   failure_rate_threshold: 100
   permitted_calls_in_half_open_state: 5
   wait_duration_in_open_state: 1s
+
+ai_agent:
+  filtering:
+    stop_words:
+      - spam
+      - ads
+      - promo
+    excluded_authors:
+      - bot-user
+    min_length: 20
+  summarization:
+    threshold: 500

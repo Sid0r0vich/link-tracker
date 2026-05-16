@@ -23,13 +23,13 @@ func NewUpdateBrokerService(
 ) (*UpdateBrokerService, error) {
 	saramaCfg := broker.NewConfig()
 	if err := broker.CreateTopicIfNotExists(cfg, saramaCfg); err != nil {
-		return nil, fmt.Errorf("create kafka topic %q: %w", cfg.Topic, err)
+		return nil, fmt.Errorf("create kafka topic %q: %w", cfg.Raw.Topic, err)
 	}
 	producer, err := broker.NewProducer(ctx, saramaCfg, logger, cfg.Brokers)
 	if err != nil {
 		return nil, fmt.Errorf("create update producer: %w", err)
 	}
-	return &UpdateBrokerService{producer: producer, topic: cfg.Topic}, nil
+	return &UpdateBrokerService{producer: producer, topic: cfg.Raw.Topic}, nil
 }
 
 func (s *UpdateBrokerService) SendUpdate(data *domain.UpdateMessage) error {

@@ -163,8 +163,10 @@ func (s *ApiTestSuite) SetupSuite() {
 			SubscriptionBatchSize: 100,
 		},
 		Kafka: config.KafkaConfig{
-			Topic:             "link_updates",
-			GroupID:           "1",
+			Raw: config.KafkaTopicConfig{
+				Topic:   "link_updates",
+				GroupID: "1",
+			},
 			NumPartitions:     1,
 			RetentionMs:       60000,
 			MinInsyncReplicas: 1,
