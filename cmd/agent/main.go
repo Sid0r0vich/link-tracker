@@ -36,8 +36,8 @@ func NewApp() *fx.App {
 			func(ctx context.Context, cfg *config.Config, logger *slog.Logger) (*update.UpdateBrokerService, error) {
 				return update.NewUpdateBrokerService(ctx, cfg.Kafka.Processed.Topic, &cfg.Kafka, logger)
 			},
-			func(updater *update.UpdateBrokerService, logger *slog.Logger) *brokerhandler.AgentMessageHandler {
-				return brokerhandler.NewAgentMessageHandler(updater, logger)
+			func(cfg *config.Config, updater *update.UpdateBrokerService, logger *slog.Logger) *brokerhandler.AgentMessageHandler {
+				return brokerhandler.NewAgentMessageHandler(updater, cfg.AIAgent.Filtering, logger)
 			},
 		),
 		fx.Invoke(run),

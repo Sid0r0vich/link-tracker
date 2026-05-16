@@ -373,7 +373,7 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperOrmRepositoryKafkaUpdater() {
 	agentWG.Add(1)
 	go func() {
 		defer agentWG.Done()
-		agentHandler := brokerhandler.NewAgentMessageHandler(agentUpdateBrokerService, s.logger)
+		agentHandler := brokerhandler.NewAgentMessageHandler(agentUpdateBrokerService, s.cfg.AIAgent.Filtering, s.logger)
 		_ = broker.StartConsumerGroup(
 			agentCtx,
 			broker.NewConfig(),
