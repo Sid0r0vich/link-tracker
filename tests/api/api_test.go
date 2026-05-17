@@ -180,6 +180,12 @@ func (s *ApiTestSuite) SetupSuite() {
 			UrlValidationEnabled: true,
 			OldUpdatesEnabled:    true,
 		},
+		AIAgent: config.AIConfig{
+			Summarization: config.SummarizationConfig{
+				Mode:      config.SummarizationModeStub,
+				Threshold: 500,
+			},
+		},
 		HTTP: config.HTTPConfig{
 			Timeout: time.Second * 5,
 		},
@@ -373,7 +379,8 @@ func (s *ApiTestSuite) TestApiAddLinkRestScrapperOrmRepositoryKafkaUpdater() {
 	agentWG.Add(1)
 	go func() {
 		defer agentWG.Done()
-		agentHandler := brokerhandler.NewAgentMessageHandler(agentUpdateBrokerService, s.cfg.AIAgent.Filtering, s.logger)
+		agentHandler, err := brokerhandler.NewAgentMessageHandler(agentUpdateBrokerService, s.cfg.AIAgent.Filtering, s.cfg.AIAgent.Summarization, s.logger)
+		s.Require().NoError(err)
 		_ = broker.StartConsumerGroup(
 			agentCtx,
 			broker.NewConfig(),

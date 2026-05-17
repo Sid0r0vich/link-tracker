@@ -40,12 +40,12 @@ func (s *GithubSuite) SetupTest() {
 		Body:        body,
 	}
 	s.cb = &config.CircuitBreakerConfig{
-		SlidingWindowSize:        time.Millisecond * 500,
-		SlidingWindowBucketSize:  time.Millisecond * 100,
+		SlidingWindowSize:        500 * time.Millisecond,
+		SlidingWindowBucketSize:  100 * time.Millisecond,
 		MinimumRequiredCalls:     2,
 		FailureRateThreshold:     51,
 		PermittedCallsInHalfOpen: 4,
-		WaitDurationInOpenState:  time.Second,
+		WaitDurationInOpenState:  100 * time.Millisecond,
 	}
 	s.ts = mocks.NewMockGithubAPI(s.T(), s.cfg, createdAt)
 }
@@ -99,7 +99,7 @@ func (s *GithubSuite) TestGetUpdateTimeout() {
 func (s *GithubSuite) TestCircuitBreaker() {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	scr := scrapper.NewGithubScrapper(&config.HTTPConfig{Timeout: time.Millisecond, RetryCount: 1}, s.cb, "test-token", logger)
+	scr := scrapper.NewGithubScrapper(&config.HTTPConfig{Timeout: 50 * time.Millisecond, RetryCount: 1}, s.cb, "test-token", logger)
 	scr.ApiScheme = "http"
 	scr.ApiHost = s.ts.Listener.Addr().String()
 
@@ -116,7 +116,7 @@ func (s *GithubSuite) TestCircuitBreaker() {
 	s.True(errors.Is(err, uerrors.ErrOpenState))
 
 	// half-open and recover
-	time.Sleep(s.cb.WaitDurationInOpenState * 2)
+	time.Sleep(s.cb.WaitDurationInOpenState + 50*time.Millisecond)
 	_, err = scr.GetUpdate(okUrl)
 	s.NoError(err)
 	_, err = scr.GetUpdate(okUrl)
@@ -129,7 +129,7 @@ func (s *GithubSuite) TestCircuitBreaker() {
 	s.NoError(err)
 
 	// open again
-	time.Sleep(time.Second)
+	time.Sleep(s.cb.SlidingWindowSize + 50*time.Millisecond)
 	_, err = scr.GetUpdate(timeoutUrl)
 	s.True(errors.Is(err, uerrors.ErrAPIUnavailable))
 	_, err = scr.GetUpdate(timeoutUrl)
@@ -138,7 +138,7 @@ func (s *GithubSuite) TestCircuitBreaker() {
 	s.True(errors.Is(err, uerrors.ErrOpenState))
 
 	// half-open and fail
-	time.Sleep(s.cb.WaitDurationInOpenState * 2)
+	time.Sleep(s.cb.WaitDurationInOpenState + 50*time.Millisecond)
 	_, err = scr.GetUpdate(okUrl)
 	s.NoError(err)
 	_, err = scr.GetUpdate(timeoutUrl)

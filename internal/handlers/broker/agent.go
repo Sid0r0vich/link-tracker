@@ -17,11 +17,18 @@ type Updater interface {
 type AgentMessageHandler struct {
 	updateService Updater
 	filtering     config.FilteringConfig
+	summarization config.SummarizationConfig
+	summarizer    Summarizer
 	logger        *slog.Logger
 }
 
-func NewAgentMessageHandler(updater Updater, filtering config.FilteringConfig, logger *slog.Logger) *AgentMessageHandler {
-	return &AgentMessageHandler{updateService: updater, filtering: filtering, logger: logger}
+func NewAgentMessageHandler(updater Updater, filtering config.FilteringConfig, summarization config.SummarizationConfig, logger *slog.Logger) (*AgentMessageHandler, error) {
+	summarizer, err := newSummarizer(summarization, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AgentMessageHandler{updateService: updater, filtering: filtering, summarization: summarization, summarizer: summarizer, logger: logger}, nil
 }
 
 func (s *AgentMessageHandler) Handle(msg *sarama.ConsumerMessage) {
@@ -38,6 +45,8 @@ func (s *AgentMessageHandler) Handle(msg *sarama.ConsumerMessage) {
 		s.logger.Info("update filtered out")
 		return
 	}
+
+	req.Data = s.summarizeEvents(req.Data)
 
 	if err := s.updateService.SendUpdate(&req); err != nil {
 		s.logger.Error("sending update", slog.String("error", err.Error()))
@@ -92,4 +101,43 @@ func (s *AgentMessageHandler) isExcludedAuthor(username string) bool {
 	}
 
 	return false
+}
+
+func (s *AgentMessageHandler) summarizeEvents(events []domain.Event) []domain.Event {
+	if s.summarizer == nil || s.summarization.Threshold <= 0 {
+		return events
+	}
+
+	summarized := make([]domain.Event, len(events))
+	copy(summarized, events)
+
+	for idx := range summarized {
+		text := s.eventText(summarized[idx])
+		if runeLen(text) <= s.summarization.Threshold {
+			continue
+		}
+
+		summary, err := s.summarizer.Summarize(text)
+		if err != nil {
+			s.logger.Error("summarizing update", slog.String("error", err.Error()))
+			continue
+		}
+
+		summarized[idx].Description = summary
+	}
+
+	return summarized
+}
+
+func (s *AgentMessageHandler) eventText(event domain.Event) string {
+	text := strings.TrimSpace(event.Title)
+	if event.Description == "" {
+		return text
+	}
+
+	if text == "" {
+		return strings.TrimSpace(event.Description)
+	}
+
+	return text + "\n" + strings.TrimSpace(event.Description)
 }

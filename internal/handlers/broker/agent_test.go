@@ -24,9 +24,11 @@ func (s *stubUpdater) SendUpdate(data *domain.UpdateMessage) error {
 	return nil
 }
 
-func newTestHandler(filtering config.FilteringConfig, updater *stubUpdater) *AgentMessageHandler {
+func newTestHandler(t *testing.T, filtering config.FilteringConfig, summarization config.SummarizationConfig, updater *stubUpdater) *AgentMessageHandler {
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
-	return NewAgentMessageHandler(updater, filtering, logger)
+	handler, err := NewAgentMessageHandler(updater, filtering, summarization, logger)
+	require.NoError(t, err)
+	return handler
 }
 
 func newTestMessage(data domain.UpdateMessage) *sarama.ConsumerMessage {
@@ -38,10 +40,10 @@ func TestAgentMessageHandlerFiltersByStopWords(t *testing.T) {
 	t.Parallel()
 
 	updater := &stubUpdater{}
-	handler := newTestHandler(config.FilteringConfig{
+	handler := newTestHandler(t, config.FilteringConfig{
 		StopWords: []string{"spam"},
 		MinLength: 20,
-	}, updater)
+	}, config.SummarizationConfig{Mode: config.SummarizationModeStub, Threshold: 100}, updater)
 
 	handler.Handle(newTestMessage(domain.UpdateMessage{
 		Id: 1,
@@ -58,10 +60,10 @@ func TestAgentMessageHandlerFiltersByAuthor(t *testing.T) {
 	t.Parallel()
 
 	updater := &stubUpdater{}
-	handler := newTestHandler(config.FilteringConfig{
+	handler := newTestHandler(t, config.FilteringConfig{
 		ExcludedAuthors: []string{"annoying-bot"},
 		MinLength:       20,
-	}, updater)
+	}, config.SummarizationConfig{Mode: config.SummarizationModeStub, Threshold: 100}, updater)
 
 	handler.Handle(newTestMessage(domain.UpdateMessage{
 		Id: 2,
@@ -81,9 +83,9 @@ func TestAgentMessageHandlerFiltersByMinimumLength(t *testing.T) {
 	t.Parallel()
 
 	updater := &stubUpdater{}
-	handler := newTestHandler(config.FilteringConfig{
+	handler := newTestHandler(t, config.FilteringConfig{
 		MinLength: 20,
-	}, updater)
+	}, config.SummarizationConfig{Mode: config.SummarizationModeStub, Threshold: 100}, updater)
 
 	handler.Handle(newTestMessage(domain.UpdateMessage{
 		Id: 3,
@@ -102,11 +104,11 @@ func TestAgentMessageHandlerPassesUpdateThroughFilter(t *testing.T) {
 	t.Parallel()
 
 	updater := &stubUpdater{}
-	handler := newTestHandler(config.FilteringConfig{
+	handler := newTestHandler(t, config.FilteringConfig{
 		StopWords:       []string{"spam"},
 		ExcludedAuthors: []string{"annoying-bot"},
 		MinLength:       20,
-	}, updater)
+	}, config.SummarizationConfig{Mode: config.SummarizationModeStub, Threshold: 100}, updater)
 
 	handler.Handle(newTestMessage(domain.UpdateMessage{
 		Id: 4,

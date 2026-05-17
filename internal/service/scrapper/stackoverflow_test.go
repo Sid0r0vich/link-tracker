@@ -40,15 +40,15 @@ func (s *StackoverflowSuite) SetupTest() {
 		TimeoutPath: "/timeout",
 		FailPath:    "/fail",
 		Body:        body,
-		Timeout:     time.Second,
+		Timeout:     200 * time.Millisecond,
 	}
 	s.cb = &config.CircuitBreakerConfig{
-		SlidingWindowSize:        time.Millisecond * 500,
-		SlidingWindowBucketSize:  time.Millisecond * 100,
+		SlidingWindowSize:        500 * time.Millisecond,
+		SlidingWindowBucketSize:  100 * time.Millisecond,
 		MinimumRequiredCalls:     2,
 		FailureRateThreshold:     51,
 		PermittedCallsInHalfOpen: 4,
-		WaitDurationInOpenState:  time.Second,
+		WaitDurationInOpenState:  100 * time.Millisecond,
 	}
 	s.ts = mocks.NewMockStackoverflowAPI(s.T(), s.cfg, s.creationDate, s.lastActivity)
 }
@@ -116,7 +116,7 @@ func (s *StackoverflowSuite) TestGetUpdate_Timeout() {
 func (s *StackoverflowSuite) TestCircuitBreaker() {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	scr := scrapper.NewStackoverflowScrapper(&config.HTTPConfig{Timeout: time.Millisecond, RetryCount: 1}, s.cb, "test-key", logger)
+	scr := scrapper.NewStackoverflowScrapper(&config.HTTPConfig{Timeout: 50 * time.Millisecond, RetryCount: 1}, s.cb, "test-key", logger)
 	scr.ApiScheme = "http"
 	scr.ApiHost = s.ts.Listener.Addr().String()
 
@@ -133,7 +133,7 @@ func (s *StackoverflowSuite) TestCircuitBreaker() {
 	s.True(errors.Is(err, uerrors.ErrOpenState))
 
 	// half-open and recover
-	time.Sleep(s.cb.WaitDurationInOpenState * 2)
+	time.Sleep(s.cb.WaitDurationInOpenState + 50*time.Millisecond)
 	_, err = scr.GetUpdate(okUrl)
 	s.NoError(err)
 	_, err = scr.GetUpdate(okUrl)
@@ -146,7 +146,7 @@ func (s *StackoverflowSuite) TestCircuitBreaker() {
 	s.NoError(err)
 
 	// open again
-	time.Sleep(time.Second)
+	time.Sleep(s.cb.SlidingWindowSize + 50*time.Millisecond)
 	_, err = scr.GetUpdate(timeoutUrl)
 	s.True(errors.Is(err, uerrors.ErrAPIUnavailable))
 	_, err = scr.GetUpdate(timeoutUrl)
@@ -155,7 +155,7 @@ func (s *StackoverflowSuite) TestCircuitBreaker() {
 	s.True(errors.Is(err, uerrors.ErrOpenState))
 
 	// half-open and fail
-	time.Sleep(s.cb.WaitDurationInOpenState * 2)
+	time.Sleep(s.cb.WaitDurationInOpenState + 50*time.Millisecond)
 	_, err = scr.GetUpdate(okUrl)
 	s.NoError(err)
 	_, err = scr.GetUpdate(timeoutUrl)

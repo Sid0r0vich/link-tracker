@@ -74,6 +74,22 @@ func (d RetryStrategyType) IsValid() bool {
 	}
 }
 
+type SummarizationMode string
+
+const (
+	SummarizationModeStub SummarizationMode = "stub"
+	SummarizationModeAI   SummarizationMode = "ai"
+)
+
+func (m SummarizationMode) IsValid() bool {
+	switch m {
+	case SummarizationModeStub, SummarizationModeAI:
+		return true
+	default:
+		return false
+	}
+}
+
 type Config struct {
 	Database       DatabaseConfig       `mapstructure:"database"`
 	Bot            BotConfig            `mapstructure:"bot"`
@@ -169,7 +185,12 @@ type FilteringConfig struct {
 }
 
 type SummarizationConfig struct {
-	Threshold int `mapstructure:"threshold"`
+	Mode      SummarizationMode `mapstructure:"mode"`
+	Threshold int               `mapstructure:"threshold"`
+	AIApiKey  string            `mapstructure:"ai_api_key"`
+	YandexFolderID string      `mapstructure:"yandex_folder_id"`
+	BaseURL   string            `mapstructure:"base_url"`
+	Timeout   time.Duration     `mapstructure:"timeout"`
 }
 
 func LoadConfig(logger *slog.Logger) (*Config, error) {
@@ -200,6 +221,8 @@ func newConfigFromFile(name string) (*Config, error) {
 	v.BindEnv("valkey.password", "VALKEY_PASSWORD")
 
 	v.BindEnv("bot.token", "BOT_TOKEN")
+	v.BindEnv("ai_agent.summarization.ai_api_key", "AI_API_KEY")
+	v.BindEnv("ai_agent.summarization.yandex_folder_id", "YANDEX_FOLDER_ID")
 
 	v.BindEnv("scrapper.db_access_type", "SCRAPPER_DB_ACCESS_TYPE")
 	v.BindEnv("scrapper.transport_protocol", "SCRAPPER_TRANSPORT_PROTOCOL")
@@ -211,6 +234,10 @@ func newConfigFromFile(name string) (*Config, error) {
 
 	if err := v.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("unmarshal config: %w", err)
+	}
+
+	if !cfg.AIAgent.Summarization.Mode.IsValid() {
+		return nil, fmt.Errorf("invalid summarization mode: %s", cfg.AIAgent.Summarization.Mode)
 	}
 
 	if !cfg.Scrapper.DBAccessType.IsValid() {
@@ -227,6 +254,10 @@ func newConfigFromFile(name string) (*Config, error) {
 
 	if !cfg.HTTP.RetryStrategy.IsValid() {
 		return nil, fmt.Errorf("invalid retry strategy: %s", cfg.HTTP.RetryStrategy)
+	}
+
+	if !cfg.AIAgent.Summarization.Mode.IsValid() {
+		return nil, fmt.Errorf("invalid summarization mode: %s", cfg.AIAgent.Summarization.Mode)
 	}
 
 	return cfg, nil

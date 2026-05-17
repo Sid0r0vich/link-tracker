@@ -13,7 +13,7 @@ bot:
 
 scrapper:
   server_addr: link-tracker-scrapper:1234
-  update_communication_type: fallback
+  update_communication_type: kafka
   cache_enabled: true
   url_validation_enabled: true
   old_updates_enabled: false
@@ -69,4 +69,6 @@ ai_agent:
       - bot-user
     min_length: 20
   summarization:
+    mode: ai
     threshold: 500
+    timeout: 10s
